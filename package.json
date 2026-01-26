@@ -12,6 +12,7 @@
     "axios": "^1.13.2",
     "framer-motion": "^12.28.2",
     "lucide-react": "^0.562.0",
+    "mongodb": "^7.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.12.0",

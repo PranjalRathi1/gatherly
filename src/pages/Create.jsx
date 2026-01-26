@@ -13,7 +13,6 @@ const Create = () => {
         const newEvent = {
             id: Date.now(),
             ...eventData,
-            isHost: true,
             participants: 1
         };
         addEvent(newEvent);

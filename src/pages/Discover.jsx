@@ -34,7 +34,6 @@ const Discover = () => {
         const newEvent = {
             id: Date.now(),
             ...eventData,
-            isHost: true,
             participants: 1
         };
         addEvent(newEvent);
@@ -60,8 +59,8 @@ const Discover = () => {
                             key={cat}
                             onClick={() => setFilter(cat)}
                             className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === cat
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                                 }`}
                         >
                             {cat.charAt(0).toUpperCase() + cat.slice(1)}

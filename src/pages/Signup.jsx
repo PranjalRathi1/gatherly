@@ -12,17 +12,55 @@ const Signup = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const handleChange = (e) => {
+        // Clear errors automatically when user types
+        if (error) setError('');
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
 
+        // 1. Input Normalization
+        const trimmedName = formData.name.trim();
+        const trimmedEmail = formData.email.trim();
+        const password = formData.password;
+
+        // 2. Client-side Validation
+        // Name check
+        if (!trimmedName) {
+            setError('Please enter your full name');
+            setLoading(false);
+            return;
+        }
+
+        // Strict Email Regex: Contains @, domain extension, no spaces
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+        if (!emailRegex.test(trimmedEmail)) {
+            setError('Please enter a valid email address');
+            setLoading(false);
+            return;
+        }
+
+        // Password length check
+        if (password.length < 6) {
+            setError('Password must be at least 6 characters long');
+            setLoading(false);
+            return;
+        }
+
+        // 3. Backend Call (Only reached if validation passes)
         try {
-            const response = await authService.signup(formData.name, formData.email, formData.password);
+            const response = await authService.signup(trimmedName, trimmedEmail, password);
             login(response.data.user, response.data.token);
             navigate('/discover');
         } catch (err) {
-            setError('Signup failed. Please try again.');
+            // 4. Server Error Handling
+            // Prefer backend message if available, fallback to generic
+            const message = err.response?.data?.message || 'Signup failed. Please try again.';
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -43,32 +81,40 @@ const Signup = () => {
                     <Input
                         label="Full Name"
                         type="text"
+                        name="name"
                         placeholder="Enter your name"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={handleChange}
                         required
                     />
 
                     <Input
                         label="Email"
                         type="email"
+                        name="email"
                         placeholder="Enter your email"
                         value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        onChange={handleChange}
                         required
                     />
 
                     <Input
                         label="Password"
                         type="password"
+                        name="password"
                         placeholder="Create a password"
                         value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        onChange={handleChange}
                         required
                     />
 
                     {error && (
-                        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+                        <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400 p-3 rounded-lg text-sm flex items-center gap-2 animate-pulse">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            {error}
+                        </div>
                     )}
 
                     <Button type="submit" variant="primary" loading={loading} className="w-full">
