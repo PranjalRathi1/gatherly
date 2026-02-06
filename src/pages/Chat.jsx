@@ -3,78 +3,80 @@ import { useParams, useNavigate } from 'react-router-dom';
 import PageWrapper from '../components/layout/PageWrapper';
 import ChatBubble from '../components/chat/ChatBubble';
 import ChatInput from '../components/chat/ChatInput';
-import { useChatStore } from '../store/chatStore';
-import { useEventStore } from '../store/eventStore';
 import { useAuthStore } from '../store/authStore';
-import { mockEvents } from '../utils/mockData';
+import socketService from '../services/socketService';
+import api from '../services/api';
 
 const Chat = () => {
     const { eventId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuthStore();
-    const { isJoined } = useEventStore();
-    const { addMessage, getMessages, initChat } = useChatStore();
+    const [messages, setMessages] = useState([]);
     const messagesEndRef = useRef(null);
+    const [isOthersTyping, setIsOthersTyping] = useState(false);
 
-    const event = mockEvents.find(e => e.id === parseInt(eventId));
-    const messages = getMessages(eventId);
+    // Fetch history (Step 3)
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const { data } = await api.get(`/messages/${eventId}`);
+                if (data.success) {
+                    setMessages(data.data.map(msg => ({
+                        id: msg._id,
+                        message: msg.text,
+                        sender: msg.sender?.name || 'Unknown',
+                        timestamp: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                        isSent: msg.sender?._id === user?._id || msg.sender === user?._id
+                    })));
+                }
+            } catch (error) {
+                console.error('Fetch history error:', error);
+            }
+        };
+        fetchHistory();
+    }, [eventId, user]);
 
     useEffect(() => {
-        initChat(eventId);
-
-        // Add some mock messages
-        if (messages.length === 0) {
-            const mockMessages = [
-                {
-                    id: 1,
-                    message: 'Hey everyone! Looking forward to this event!',
-                    sender: 'Sarah Johnson',
-                    timestamp: '10:30 AM',
-                    isSent: false
-                },
-                {
-                    id: 2,
-                    message: 'Same here! Should be fun 🎉',
-                    sender: 'Mike Chen',
-                    timestamp: '10:32 AM',
-                    isSent: false
-                }
-            ];
-            mockMessages.forEach(msg => addMessage(eventId, msg));
+        const token = localStorage.getItem('token');
+        if (token) {
+            socketService.connect(token);
         }
-    }, [eventId]);
+
+        socketService.emit('join_event_room', eventId);
+
+        const handleReceiveMessage = (msg) => {
+            setMessages(prev => [...prev, {
+                id: msg._id,
+                message: msg.text,
+                sender: msg.sender?.name || 'Unknown',
+                timestamp: new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                isSent: msg.sender === user?._id || msg.sender?._id === user?._id
+            }]);
+        };
+
+        const handleTyping = () => setIsOthersTyping(true);
+        const handleStopTyping = () => setIsOthersTyping(false);
+
+        socketService.on('receive_message', handleReceiveMessage);
+        socketService.on('typing', handleTyping);
+        socketService.on('stop_typing', handleStopTyping);
+
+        return () => {
+            socketService.off('receive_message', handleReceiveMessage);
+            socketService.off('typing', handleTyping);
+            socketService.off('stop_typing', handleStopTyping);
+        };
+    }, [eventId, user]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, isOthersTyping]);
 
-    if (!isJoined(parseInt(eventId))) {
-        return (
-            <PageWrapper>
-                <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                        Join the event to access chat
-                    </h2>
-                    <button
-                        onClick={() => navigate(`/event/${eventId}`)}
-                        className="text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                        Go to event page
-                    </button>
-                </div>
-            </PageWrapper>
-        );
-    }
-
-    const handleSendMessage = (message) => {
-        const newMessage = {
-            id: Date.now(),
-            message,
-            sender: user?.name || 'You',
-            timestamp: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-            isSent: true
-        };
-        addMessage(eventId, newMessage);
+    const handleSendMessage = (payload) => {
+        socketService.emit('send_message', {
+            eventId,
+            text: payload.content,
+        });
     };
 
     return (
@@ -92,24 +94,42 @@ const Chat = () => {
                     </button>
                     <div className="flex-1">
                         <h2 className="font-semibold text-gray-900 dark:text-white">
-                            {event?.title || 'Event Chat'}
+                            Event Chat
                         </h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {event?.participants || 0} participants
-                        </p>
                     </div>
                 </div>
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4">
-                    {messages.map((msg) => (
-                        <ChatBubble key={msg.id} {...msg} />
-                    ))}
+                    {messages.length === 0 ? (
+                        <div className="flex justify-center items-center h-full text-gray-400">
+                            No messages yet. Start the conversation!
+                        </div>
+                    ) : (
+                        messages.map((msg) => (
+                            <ChatBubble key={msg.id} {...msg} />
+                        ))
+                    )}
+                    {/* Typing Indicator */}
+                    {isOthersTyping && (
+                        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-sm ml-2 mt-2">
+                            <div className="flex gap-1">
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></span>
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></span>
+                            </div>
+                            Someone is typing...
+                        </div>
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
 
                 {/* Input */}
-                <ChatInput onSend={handleSendMessage} />
+                <ChatInput
+                    onSend={handleSendMessage}
+                    onTypingStart={() => socketService.emit('typing', eventId)}
+                    onTypingStop={() => socketService.emit('stop_typing', eventId)}
+                />
             </div>
         </PageWrapper>
     );

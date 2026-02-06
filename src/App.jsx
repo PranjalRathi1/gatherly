@@ -15,7 +15,10 @@ import BlogDetail from './pages/BlogDetail';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import Create from './pages/Create';
-import Festivals from './pages/Festivals'; // <--- IMPORT THIS
+import Festivals from './pages/Festivals';
+import Concerts from './pages/Concerts';
+import Travel from './pages/Travel';
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -38,20 +41,25 @@ function App() {
                         <ProtectedRoute>
                             <AppLayout>
                                 <Routes>
-                                    <Route path="discover" element={<Discover />} />
-                                    <Route path="festivals" element={<Festivals />} /> {/* <--- ADDED ROUTE */}
-                                    
+                                    <Route path="events" element={<Discover />} />
+                                    <Route path="discover" element={<Navigate to="/events" replace />} /> {/* Redirect old route */}
+                                    <Route path="concerts" element={<Concerts />} />
+                                    <Route path="travel" element={<Travel />} />
+                                    <Route path="blogs" element={<Blogs />} />
+
                                     <Route path="event/:id" element={<EventDetail />} />
                                     <Route path="chat/:eventId" element={<Chat />} />
+
+                                    {/* Keep existing routes if they don't conflict */}
                                     <Route path="moments" element={<Moments />} />
-                                    <Route path="blogs" element={<Blogs />} />
                                     <Route path="blog/:id" element={<BlogDetail />} />
                                     <Route path="notifications" element={<Notifications />} />
                                     <Route path="profile" element={<Profile />} />
                                     <Route path="create" element={<Create />} />
-                                    
-                                    {/* Redirect Loop Fix: Use absolute path '/' */}
-                                    <Route path="*" element={<Navigate to="/discover" replace />} />
+                                    <Route path="festivals" element={<Festivals />} />
+
+                                    {/* Default redirect to events */}
+                                    <Route path="*" element={<Navigate to="/events" replace />} />
                                 </Routes>
                             </AppLayout>
                         </ProtectedRoute>

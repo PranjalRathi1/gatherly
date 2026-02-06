@@ -2,22 +2,27 @@ import { create } from 'zustand';
 
 export const useEventStore = create((set, get) => ({
     events: [],
-    joinedEvents: [],
+    joinedEvents: JSON.parse(localStorage.getItem('joinedEvents') || '[]'),
     loading: false,
 
     setEvents: (events) => set({ events }),
 
-    addEvent: (event) => set((state) => ({
-        events: [event, ...state.events]
-    })),
+    setJoinedEvents: (eventIds) => {
+        localStorage.setItem('joinedEvents', JSON.stringify(eventIds));
+        set({ joinedEvents: eventIds });
+    },
 
-    joinEvent: (eventId) => set((state) => ({
-        joinedEvents: [...state.joinedEvents, eventId]
-    })),
+    joinEvent: (eventId) => {
+        const updated = [...new Set([...get().joinedEvents, eventId])];
+        localStorage.setItem('joinedEvents', JSON.stringify(updated));
+        set({ joinedEvents: updated });
+    },
 
-    leaveEvent: (eventId) => set((state) => ({
-        joinedEvents: state.joinedEvents.filter(id => id !== eventId)
-    })),
+    leaveEvent: (eventId) => {
+        const updated = get().joinedEvents.filter(id => id !== eventId);
+        localStorage.setItem('joinedEvents', JSON.stringify(updated));
+        set({ joinedEvents: updated });
+    },
 
     isJoined: (eventId) => {
         return get().joinedEvents.includes(eventId);

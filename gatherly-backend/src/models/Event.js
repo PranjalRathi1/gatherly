@@ -3,33 +3,28 @@ import mongoose from 'mongoose';
 const eventSchema = new mongoose.Schema({
     title: {
         type: String,
-        required: [true, 'Please provide an event title']
+        required: [true, 'Please add a title']
     },
     description: {
         type: String,
-        required: [true, 'Please provide an event description']
+        required: [true, 'Please add a description']
     },
-    date: {
+    // NOTE: Event types are lowercase to ensure API consistency.
+    // Frontend must map constants (e.g., CONCERT -> 'concert')
+    type: {
         type: String,
-        required: [true, 'Please provide an event date']
-    },
-    time: {
-        type: String,
-        required: [true, 'Please provide an event time']
+        enum: ['concert', 'travel', 'trek', 'meetup'],
+        required: [true, 'Please specify event type']
     },
     location: {
         type: String,
-        required: [true, 'Please provide an event location']
+        required: [true, 'Please add a location']
     },
-    category: {
-        type: String,
-        required: [true, 'Please provide an event category']
+    date: {
+        type: Date,
+        required: [true, 'Please add a date']
     },
-    image: {
-        type: String,
-        default: ''
-    },
-    host: {
+    createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
@@ -43,6 +38,10 @@ const eventSchema = new mongoose.Schema({
         default: Date.now
     }
 });
+
+// Indexes
+eventSchema.index({ type: 1 });
+eventSchema.index({ date: 1 });
 
 const Event = mongoose.model('Event', eventSchema);
 

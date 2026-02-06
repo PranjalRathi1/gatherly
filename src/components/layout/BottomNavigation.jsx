@@ -6,7 +6,7 @@ const BottomNavigation = () => {
 
     const navItems = [
         {
-            path: '/home',
+            path: '/events',
             label: 'Home',
             icon: (active) => (
                 <svg className="w-6 h-6" fill={active ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
@@ -62,8 +62,8 @@ const BottomNavigation = () => {
                             key={item.path}
                             to={item.path}
                             className={`flex flex-col items-center justify-center flex-1 h-full transition-colors ${isActive
-                                    ? 'text-blue-500'
-                                    : 'text-gray-400'
+                                ? 'text-blue-500'
+                                : 'text-gray-400'
                                 }`}
                         >
                             {item.icon(isActive)}

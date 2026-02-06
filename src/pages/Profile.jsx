@@ -61,8 +61,8 @@ const Profile = () => {
                         <div className="space-y-3">
                             {myEvents.map((event) => (
                                 <div
-                                    key={event.id}
-                                    onClick={() => navigate(`/event/${event.id}`)}
+                                    key={event._id}
+                                    onClick={() => navigate(`/event/${event._id}`)}
                                     className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors"
                                 >
                                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
