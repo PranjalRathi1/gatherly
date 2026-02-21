@@ -1,3 +1,6 @@
+
+const seedTestEvent = require('./utils/seedTestEvent');
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -16,17 +19,24 @@ const server = http.createServer(app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    methods: ["GET", "POST"]
+    origin: true,
+    credentials: true
   }
 });
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB AND seed after successful connection
+connectDB()
+  .then(() => {
+    return seedTestEvent();
+  })
+  .catch((err) => {
+    console.error("Database connection failed:", err);
+  });
+
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: true,
   credentials: true
 }));
 app.use(express.json());
@@ -79,7 +89,7 @@ app.use((req, res) => {
 // Start server
 const PORT = process.env.PORT || 5002;
 
-server.listen(PORT, "127.0.0.1", () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });

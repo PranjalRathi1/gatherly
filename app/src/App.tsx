@@ -7,10 +7,12 @@ import Signup from '@/pages/Signup';
 import Login from '@/pages/Login';
 import Events from '@/pages/Events';
 import EventChat from '@/pages/EventChat';
-import Afterglow from '@/pages/Afterglow';
+import AfterglowPage from '@/pages/Afterglow';
 import Profile from '@/pages/Profile';
+import ManageEvent from '@/pages/ManageEvent';
 import PenguinCompanion from '@/components/PenguinCompanion';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import CreateEvent from '@/pages/CreateEvent';
 
 function App() {
   const { isAuthenticated } = useAuthStore();
@@ -38,6 +40,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/events/:eventId/chat"
             element={
@@ -46,14 +49,31 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
-            path="/afterglow"
+            path="/events/create"
             element={
               <ProtectedRoute>
-                <Afterglow />
+                <CreateEvent />
               </ProtectedRoute>
             }
           />
+
+
+
+
+          {/* ✅ NEW MANAGE EVENT ROUTE */}
+          <Route
+            path="/events/:id/manage"
+            element={
+              <ProtectedRoute>
+                <ManageEvent />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/afterglow" element={<AfterglowPage />} />
+
           <Route
             path="/profile/:userId?"
             element={
@@ -69,7 +89,7 @@ function App() {
             element={<Navigate to={isAuthenticated ? "/events" : "/login"} />}
           />
 
-          {/* 404 - Redirect to home */}
+          {/* 404 */}
           <Route
             path="*"
             element={<Navigate to="/" />}

@@ -44,7 +44,24 @@ const eventSchema = new mongoose.Schema({
   imageUrl: {
     type: String,
     default: ''
-  }
+  },
+  visibility: {
+    type: String,
+    enum: ['public', 'private'],
+    default: 'public'
+  },
+
+  joinCode: {
+    type: String,
+    default: null
+  },
+
+  joinRequests: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
+
+
 }, {
   timestamps: true
 });
@@ -53,6 +70,6 @@ const eventSchema = new mongoose.Schema({
 eventSchema.index({ location: 1 });
 eventSchema.index({ date: 1 });
 eventSchema.index({ category: 1 });
-eventSchema.index({ createAt: -1 });
+
 
 module.exports = mongoose.model('Event', eventSchema);

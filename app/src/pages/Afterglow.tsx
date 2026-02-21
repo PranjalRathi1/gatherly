@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { afterglowApi, type Afterglow } from '@/api/afterglow';
+import { afterglowApi, type AfterglowData } from '@/api/afterglow';
 import { eventsApi, type Event } from '@/api/events';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,13 +22,13 @@ const Afterglow = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
     const { isOnline } = useBackendStatus();
-    const [afterglows, setAfterglows] = useState<Afterglow[]>([]);
+    const [afterglows, setAfterglows] = useState<AfterglowData[]>([]);
     const [events, setEvents] = useState<Event[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingAfterglow, setEditingAfterglow] = useState<Afterglow | null>(null);
+    const [editingAfterglow, setEditingAfterglow] = useState<AfterglowData | null>(null);
     const [pendingCount, setPendingCount] = useState(0);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -133,7 +133,7 @@ const Afterglow = () => {
         setEditingAfterglow(null);
     };
 
-    const handleOpenDialog = (afterglow?: Afterglow) => {
+    const handleOpenDialog = (afterglow?: AfterglowData) => {
         if (afterglow) {
             setEditingAfterglow(afterglow);
             setFormData({
@@ -172,7 +172,7 @@ const Afterglow = () => {
 
             // Create optimistic post for immediate UI feedback
             const tempId = `temp-${Date.now()}`;
-            const optimisticPost: Afterglow = {
+            const optimisticPost: AfterglowData = {
                 _id: tempId,
                 title: data.title,
                 content: data.content,
@@ -249,7 +249,7 @@ const Afterglow = () => {
         });
     };
 
-    const isAuthor = (afterglow: Afterglow) => {
+    const isAuthor = (afterglow: AfterglowData) => {
         return afterglow.author._id === user?.id;
     };
 

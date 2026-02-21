@@ -10,32 +10,23 @@ module.exports = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        // Arctic Night Base Colors
-        arctic: {
-          deepest: '#0A1628',
-          deep: '#142740',
-          mid: '#1E3A5F',
-          light: '#2E5077',
-        },
-        // Aurora Accents (Penguin Magic)
-        aurora: {
-          cyan: '#00E5FF',
-          purple: '#B388FF',
-          pink: '#FF6EC7',
-          green: '#64FFDA',
-        },
-        // Ice Tones (Neutral)
-        ice: {
-          white: '#F8FBFF',
-          gray: '#E1EAF4',
-          dark: '#8B9BAC',
-          darker: '#4A5568',
-        },
-        // Event Category Glows
-        vibe: {
-          concert: '#FF6B9D',
-          travel: '#4ECDC4',
-          trek: '#FFB84D',
+        // Subtle category badge colors (muted, professional)
+        category: {
+          concert: {
+            light: '#EFF6FF',    // blue-50
+            DEFAULT: '#3B82F6',  // blue-500
+            foreground: '#1E40AF' // blue-800
+          },
+          travel: {
+            light: '#F8FAFC',    // slate-50
+            DEFAULT: '#64748B',  // slate-500
+            foreground: '#334155' // slate-700
+          },
+          trekking: {
+            light: '#ECFDF5',    // emerald-50
+            DEFAULT: '#10B981',  // emerald-500
+            foreground: '#065F46' // emerald-800
+          },
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -90,7 +81,13 @@ module.exports = {
         xs: "calc(var(--radius) - 6px)",
       },
       boxShadow: {
-        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        'xs': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        'sm': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        'DEFAULT': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        'md': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        'lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+        '2xl': '0 25px 50px -12px rgb(0 0 0 / 0.25)',
       },
       keyframes: {
         "accordion-down": {
@@ -105,26 +102,9 @@ module.exports = {
           "0%,70%,100%": { opacity: "1" },
           "20%,50%": { opacity: "0" },
         },
-        "penguin-hop": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-10px)" },
-        },
-        "penguin-wave": {
-          "0%, 100%": { transform: "rotate(0deg)" },
-          "25%": { transform: "rotate(15deg)" },
-          "75%": { transform: "rotate(-15deg)" },
-        },
         "fade-in-up": {
           "0%": { opacity: "0", transform: "translateY(10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        "shimmer": {
-          "0%": { backgroundPosition: "-1000px 0" },
-          "100%": { backgroundPosition: "1000px 0" },
-        },
-        "glow-pulse": {
-          "0%, 100%": { boxShadow: "0 0 5px currentColor, 0 0 10px currentColor" },
-          "50%": { boxShadow: "0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor" },
         },
         "slide-up": {
           "0%": { opacity: "0", transform: "translateY(20px)" },
@@ -135,11 +115,7 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
-        "penguin-hop": "penguin-hop 1s ease-in-out infinite",
-        "penguin-wave": "penguin-wave 2s ease-in-out infinite",
         "fade-in-up": "fade-in-up 0.4s ease-out",
-        "shimmer": "shimmer 2s linear infinite",
-        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
         "slide-up": "slide-up 0.3s ease-out",
       },
     },

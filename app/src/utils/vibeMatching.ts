@@ -98,10 +98,6 @@ export function calculateVibeProfile(userId: string, allEvents: Event[]): VibePr
             scores.adventure += 2;
             scores.explorer += 2;
         }
-        if (event.category === 'workshop' || event.category === 'seminar') {
-            scores.culture += 2;
-            scores.explorer += 1;
-        }
 
         // Event size scoring
         const attendeeCount = event.attendees.length;

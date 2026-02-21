@@ -1,143 +1,123 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { eventsApi, type Event } from '@/api/events';
-import { io, Socket } from 'socket.io-client';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Calendar, MapPin, Users, MessageCircle, Plus, LogOut, BookOpen, UserCircle, Loader2 } from 'lucide-react';
-import EventCategoryBadge from '@/components/EventCategoryBadge';
+import {
+  Calendar,
+  MapPin,
+  Users,
+  MessageCircle,
+  LogOut,
+  UserCircle,
+  Lock,
+  Globe
+} from 'lucide-react';
+
 import SettingsDialog from '@/components/SettingsDialog';
 import EventCardSkeleton from '@/components/EventCardSkeleton';
-import AttendeeModal from '@/components/AttendeeModal';
-import { FALLBACK_EVENTS } from '@/utils/mockEvents';
+import { useToast } from "@/hooks/use-toast";
 
 const Events = () => {
   const navigate = useNavigate();
-  const { user, token, logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const { toast } = useToast();
+
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
-  const [selectedEventForAttendees, setSelectedEventForAttendees] = useState<Event | null>(null);
-  const socketRef = useRef<Socket | null>(null);
+  const [joinCodeSearch, setJoinCodeSearch] = useState('');
 
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    date: '',
-    location: '',
-    maxAttendees: 50,
-    category: 'concert' as 'concert' | 'travel' | 'trekking'
-  });
-
-  // Fetch events on mount
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    if (!user) navigate('/login');
+  }, [user, navigate]);
 
-  // Setup Socket.io for real-time mock events
-  useEffect(() => {
-    if (!user) return;
-
-    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5002';
-    socketRef.current = io(socketUrl, {
-      auth: { token }
-    });
-
-    socketRef.current.on('connect', () => {
-      console.log('Connected to event updates');
-    });
-
-    // Listen for new mock events
-    socketRef.current.on('new-mock-event', (mockEvent: any) => {
-      console.log('Received new mock event:', mockEvent.title);
-      setEvents((prev) => [mockEvent, ...prev].slice(0, 50)); // Keep latest 50 events
-    });
-
-    return () => {
-      socketRef.current?.disconnect();
-    };
-  }, [user, token]);
-
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       setIsLoading(true);
       const data = await eventsApi.getAllEvents();
       setEvents(data);
-      setError(''); // Clear any previous errors
-    } catch (err: any) {
-      console.error('Failed to fetch events:', err);
-      const errorMessage = err.response?.data?.message || 'Could not connect to server';
-      setError(errorMessage + '. Showing sample events.');
-      // Use fallback mock events instead of showing empty UI
-      setEvents(FALLBACK_EVENTS);
+    } catch {
+      toast({
+        title: "Error",
+        description: "Could not connect to server",
+        variant: "destructive"
+      });
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  const isAttending = (event: Event) => {
+    if (!user) return false;
+    return event.attendees.some(
+      (a) => String(a._id) === String(user.id)
+    );
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const isCreator = (event: Event) => {
+    if (!user) return false;
+    return String(event.creator._id) === String(user.id);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
+  const hasRequested = (event: Event) => {
+    if (!user) return false;
+    return event.joinRequests?.some(
+      (id: any) => String(id) === String(user.id)
+    );
+  };
+
+  const handleJoinEvent = async (event: Event) => {
+    setLoadingStates(prev => ({ ...prev, [event._id]: true }));
 
     try {
-      // Ensure date is in ISO format
-      const payload = {
-        ...formData,
-        date: new Date(formData.date).toISOString()
-      };
+      let code: string | undefined;
 
-      const response: any = await eventsApi.createEvent(payload);
-      setFormData({
-        title: '',
-        description: '',
-        date: '',
-        location: '',
-        maxAttendees: 50,
-        category: 'concert'
-      });
-      setDialogOpen(false);
-
-      // Redirect to event chat
-      if (response && response.event && response.event._id) {
-        navigate(`/events/${response.event._id}/chat`);
-      } else {
-        fetchEvents();
+      if (event.visibility === 'private') {
+        code = prompt('Enter join code') || undefined;
+        if (!code) {
+          setLoadingStates(prev => ({ ...prev, [event._id]: false }));
+          return;
+        }
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create event');
-    } finally {
-      setIsCreating(false);
-    }
-  };
 
-  const handleJoinEvent = async (eventId: string) => {
-    setLoadingStates(prev => ({ ...prev, [eventId]: true }));
-    try {
-      await eventsApi.joinEvent(eventId);
+      const response = await eventsApi.joinEvent(event._id, code);
+
+      if (response.message?.includes("Awaiting")) {
+        toast({
+          title: "Request Sent",
+          description: "Waiting for creator approval ⏳"
+        });
+      } else {
+        toast({
+          title: "Joined Successfully 🎉"
+        });
+      }
+
       fetchEvents();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to join event');
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Join failed",
+        variant: "destructive"
+      });
     } finally {
-      setLoadingStates(prev => ({ ...prev, [eventId]: false }));
+      setLoadingStates(prev => ({ ...prev, [event._id]: false }));
     }
   };
 
@@ -145,21 +125,55 @@ const Events = () => {
     setLoadingStates(prev => ({ ...prev, [`leave-${eventId}`]: true }));
     try {
       await eventsApi.leaveEvent(eventId);
+      toast({ title: "Left Event" });
       fetchEvents();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to leave event');
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to leave event",
+        variant: "destructive"
+      });
     } finally {
-      setLoadingStates(prev => ({ ...prev, [`leave-${eventId}`]: false }));
+      setLoadingStates(prev => ({
+        ...prev,
+        [`leave-${eventId}`]: false
+      }));
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleDeleteEvent = async (eventId: string) => {
+    const confirmDelete = window.confirm(
+      'Are you sure you want to delete this event?'
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await eventsApi.deleteEvent(eventId);
+      toast({ title: "Event Deleted" });
+      fetchEvents();
+    } catch {
+      toast({
+        title: "Error",
+        description: "Delete failed",
+        variant: "destructive"
+      });
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const handleSearchByCode = async () => {
+    if (!joinCodeSearch.trim()) return;
+
+    try {
+      const event = await eventsApi.getEventByCode(joinCodeSearch.trim());
+      setEvents([event]);
+      toast({ title: "Private Event Found 🔐" });
+    } catch {
+      toast({ title: "Invalid Code", variant: "destructive" });
+    }
+  };
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -167,56 +181,65 @@ const Events = () => {
       hour: '2-digit',
       minute: '2-digit'
     });
-  };
 
-  const isAttending = (event: Event) => {
-    return event.attendees.some(attendee => attendee._id === user?.id);
-  };
+  const filteredEvents =
+    categoryFilter === 'all'
+      ? events
+      : events.filter(e => e.category === categoryFilter);
 
-  // Filter events by category
-  const filteredEvents = categoryFilter === 'all'
-    ? events
-    : events.filter(e => e.category === categoryFilter);
+  if (!user) return null;
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-arctic-deepest via-arctic-deep to-arctic-mid">
-        <header className="bg-arctic-deep/80 backdrop-blur-xl shadow-lg shadow-aurora-cyan/5 border-b border-aurora-cyan/20 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-5">
-            <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-aurora-cyan via-aurora-purple to-aurora-pink bg-clip-text text-transparent">
-              🐧 Gatherly Events
-            </h1>
-          </div>
-        </header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map(i => <EventCardSkeleton key={i} />)}
-          </div>
+      <div className="events-page">
+        <div className="max-w-7xl mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <EventCardSkeleton key={i} />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-arctic-deepest via-arctic-deep to-arctic-mid">
-      {/* Glassmorphism Header */}
-      <header className="bg-arctic-deep/80 backdrop-blur-xl shadow-lg shadow-aurora-cyan/5 border-b border-aurora-cyan/20 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-5 flex items-center justify-between">
-          <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-aurora-cyan via-aurora-purple to-aurora-pink bg-clip-text text-transparent">
-            🐧 Gatherly
-          </h1>
+    <div className="events-page">
+      <header className="bg-[#111] border-b border-[#2a2a2a] sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-semibold text-white">Gatherly</h1>
+
           <div className="flex items-center gap-3">
-            <span className="text-ice-gray font-body">Welcome, <strong className="text-ice-white font-mono">{user?.displayName || user?.username}</strong>! 👋</span>
-            <Button variant="outline" size="sm" onClick={() => navigate('/profile')} className="border-aurora-cyan/30 hover:border-aurora-cyan hover:bg-aurora-cyan/10 text-ice-white">
+            <span className="text-sm text-gray-400">
+              Welcome <strong className="text-white">{user.username}</strong>
+            </span>
+
+            <Button
+              size="sm"
+              className="bg-white text-black hover:bg-gray-200"
+              onClick={() => navigate('/events/create')}
+            >
+              + Create Event
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-white text-black hover:bg-gray-200"
+              onClick={() => navigate('/profile')}
+            >
               <UserCircle className="w-4 h-4 mr-2" />
               Profile
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/afterglow')} className="border-aurora-purple/30 hover:border-aurora-purple hover:bg-aurora-purple/10 text-ice-white">
-              <BookOpen className="w-4 h-4 mr-2" />
-              Afterglow
-            </Button>
+
             <SettingsDialog />
-            <Button variant="outline" onClick={handleLogout} size="sm" className="border-aurora-pink/30 hover:border-aurora-pink hover:bg-aurora-pink/10 text-ice-white">
+
+            <Button
+              size="sm"
+              className="bg-white text-black hover:bg-gray-200"
+              onClick={() => {
+                logout();
+                navigate('/login');
+              }}
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </Button>
@@ -225,329 +248,186 @@ const Events = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {error && (
-          <Alert className="mb-6 bg-aurora-pink/10 border-aurora-pink/30 text-ice-white">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
 
-        {/* Actions Bar with Category Filters */}
-        <div className="space-y-4 mb-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-3xl font-display font-bold text-ice-white">Discover Events ✨</h2>
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="text-white font-semibold">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Event
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg bg-arctic-deep border border-aurora-cyan/30 shadow-2xl shadow-aurora-cyan/10">
-                <DialogHeader>
-                  <DialogTitle className="text-ice-white font-display text-2xl">Create New Event</DialogTitle>
-                  <DialogDescription className="text-ice-gray">Fill in the details to create a new event. ✨</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-ice-white">Event Title</Label>
-                    <Input
-                      id="title"
-                      name="title"
-                      value={formData.title}
-                      onChange={handleChange}
-                      required
-                      placeholder="Enter event title"
-                      className="bg-arctic-mid/50 border-aurora-cyan/30 text-ice-white placeholder:text-ice-dark focus:border-aurora-cyan focus:ring-aurora-cyan/20 backdrop-blur-sm"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-ice-white">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleChange}
-                      required
-                      placeholder="Describe your event"
-                      rows={3}
-                      className="bg-arctic-mid/50 border-aurora-cyan/30 text-ice-white placeholder:text-ice-dark focus:border-aurora-cyan focus:ring-aurora-cyan/20 backdrop-blur-sm"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date" className="text-ice-white">Date & Time</Label>
-                    <Input
-                      id="date"
-                      name="date"
-                      type="datetime-local"
-                      value={formData.date}
-                      onChange={handleChange}
-                      required
-                      className="bg-arctic-mid/50 border-aurora-cyan/30 text-ice-white placeholder:text-ice-dark focus:border-aurora-cyan focus:ring-aurora-cyan/20 backdrop-blur-sm [&::-webkit-calendar-picker-indicator]:invert"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location" className="text-ice-white">Location</Label>
-                    <Input
-                      id="location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      required
-                      placeholder="Event location"
-                      className="bg-arctic-mid/50 border-aurora-cyan/30 text-ice-white placeholder:text-ice-dark focus:border-aurora-cyan focus:ring-aurora-cyan/20 backdrop-blur-sm"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxAttendees" className="text-ice-white">Max Attendees</Label>
-                    <Input
-                      id="maxAttendees"
-                      name="maxAttendees"
-                      type="number"
-                      value={formData.maxAttendees}
-                      onChange={handleChange}
-                      min={1}
-                      max={1000}
-                      className="bg-arctic-mid/50 border-aurora-cyan/30 text-ice-white placeholder:text-ice-dark focus:border-aurora-cyan focus:ring-aurora-cyan/20 backdrop-blur-sm"
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-aurora-cyan to-aurora-purple text-arctic-deepest font-bold hover:shadow-lg hover:shadow-aurora-cyan/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    disabled={isCreating}
-                  >
-                    {isCreating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : 'Create Event 🐧'}
-                  </Button>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
+        {/* Join Code Search */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          <input
+            type="text"
+            placeholder="Enter private event code"
+            value={joinCodeSearch}
+            onChange={(e) => setJoinCodeSearch(e.target.value)}
+            className="px-4 py-2 rounded bg-[#1a1a1a] text-white border border-[#2a2a2a]"
+          />
 
-          {/* Category Filter Pills */}
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setCategoryFilter('all')}
-              className={`px-4 py-2 rounded-full font-medium transition-all duration-300 ${categoryFilter === 'all'
-                ? 'bg-aurora-cyan text-arctic-deepest shadow-lg shadow-aurora-cyan/50 animate-glow-pulse'
-                : 'bg-arctic-light/50 text-ice-gray hover:bg-arctic-light border border-ice-dark/30'
-                }`}
-            >
-              All Events
-            </button>
-            <button
-              onClick={() => setCategoryFilter('concert')}
-              className={`px-4 py-2 rounded-full font-medium transition-all duration-300 ${categoryFilter === 'concert'
-                ? 'bg-vibe-concert text-white shadow-lg shadow-vibe-concert/50 animate-glow-pulse'
-                : 'bg-arctic-light/50 text-ice-gray hover:bg-arctic-light border border-ice-dark/30'
-                }`}
-            >
-              🎵 Concerts
-            </button>
-            <button
-              onClick={() => setCategoryFilter('travel')}
-              className={`px-4 py-2 rounded-full font-medium transition-all duration-300 ${categoryFilter === 'travel'
-                ? 'bg-vibe-travel text-white shadow-lg shadow-vibe-travel/50 animate-glow-pulse'
-                : 'bg-arctic-light/50 text-ice-gray hover:bg-arctic-light border border-ice-dark/30'
-                }`}
-            >
-              ✈️ Travel
-            </button>
-            <button
-              onClick={() => setCategoryFilter('trekking')}
-              className={`px-4 py-2 rounded-full font-medium transition-all duration-300 ${categoryFilter === 'trekking'
-                ? 'bg-vibe-trek text-white shadow-lg shadow-vibe-trek/50 animate-glow-pulse'
-                : 'bg-arctic-light/50 text-ice-gray hover:bg-arctic-light border border-ice-dark/30'
-                }`}
-            >
-              🏔 Trekking
-            </button>
-          </div>
-        </div>
+          <Button onClick={handleSearchByCode} className="bg-white text-black">
+            Search
+          </Button>
 
-        {/* Events Grid */}
-        {filteredEvents.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-ice-gray text-lg font-body">
-              {events.length === 0 ? 'No events yet. Create the first one! 🐧' : 'No events in this category yet.'}
-            </p>
-          </div>
-        ) : (
-          <motion.div
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: { opacity: 0 },
-              visible: {
-                opacity: 1,
-                transition: {
-                  staggerChildren: 0.1
-                }
-              }
-            }}
-          >
-            {filteredEvents.map((event) => {
-              // Get category-specific glow color
-              const glowColor = event.category === 'concert' ? 'vibe-concert' :
-                event.category === 'travel' ? 'vibe-travel' :
-                  event.category === 'trekking' ? 'vibe-trek' : 'aurora-cyan';
-
-              return (
-                <motion.div
-                  key={event._id}
-                  variants={{
-                    hidden: { opacity: 0, y: 20 },
-                    visible: { opacity: 1, y: 0 }
-                  }}
-                  whileHover={{
-                    y: -8,
-                    scale: 1.02,
-                    transition: { duration: 0.2 }
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Card className={`flex flex-col bg-arctic-deep/90 backdrop-blur-md shadow-xl hover:shadow-2xl hover:shadow-${glowColor}/20 transition-shadow duration-300 border border-${glowColor}/30 h-full overflow-hidden`}>
-                    {/* Event Cover Image */}
-                    <div className={`h-40 bg-gradient-to-br ${event.category === 'concert' ? 'from-vibe-concert/80 to-vibe-concert/40' :
-                      event.category === 'travel' ? 'from-vibe-travel/80 to-vibe-travel/40' :
-                        event.category === 'trekking' ? 'from-vibe-trek/80 to-vibe-trek/40' :
-                          'from-aurora-cyan/80 to-aurora-purple/40'
-                      } flex items-end justify-end p-4`}>
-                      <div className="bg-arctic-deepest/60 px-3 py-1 rounded-full text-xs font-mono text-ice-white backdrop-blur-sm">
-                        {event.category || 'event'}
-                      </div>
-                    </div>
-
-                    <CardHeader>
-                      <div className="flex items-center justify-between mb-2">
-                        <CardTitle className="text-xl font-display text-ice-white flex-1">{event.title}</CardTitle>
-                        {event.category && <EventCategoryBadge category={event.category} />}
-                      </div>
-                      <CardDescription className="line-clamp-2 text-ice-gray font-body">
-                        {event.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="flex-1 flex flex-col">
-                      <div className="space-y-2 text-sm text-ice-gray mb-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-aurora-cyan" />
-                          <span>{formatDate(event.date)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-aurora-purple" />
-                          <span>{event.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-aurora-green" />
-                          <span>{event.attendees.length} / {event.maxAttendees} attendees</span>
-                        </div>
-                        <div className="text-xs text-ice-dark font-mono">
-                          Created by {event.creator?.username || 'Unknown'}
-                        </div>
-                      </div>
-
-                      {/* Attendee Avatars */}
-                      {event.attendees && event.attendees.length > 0 && (
-                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-ice-dark/20">
-                          <div className="flex -space-x-2">
-                            {event.attendees.slice(0, 3).map((attendee, idx) => (
-                              attendee ? (
-                                <div
-                                  key={attendee._id || idx}
-                                  className="w-8 h-8 rounded-full bg-gradient-to-br from-aurora-cyan to-aurora-purple border-2 border-arctic-deep flex items-center justify-center text-xs font-bold text-white"
-                                  style={{ zIndex: 3 - idx }}
-                                >
-                                  {attendee.username?.charAt(0).toUpperCase()}
-                                </div>
-                              ) : null
-                            ))}
-                            {event.attendees.length > 3 && (
-                              <div className="w-8 h-8 rounded-full bg-ice-dark/30 border-2 border-arctic-deep flex items-center justify-center text-xs font-semibold text-ice-gray">
-                                +{event.attendees.length - 3}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-xs text-ice-gray font-body">
-                            {event.attendees.slice(0, 2).filter(Boolean).map(a => a.username).join(', ')}
-                            {event.attendees.length > 2 && ` +${event.attendees.length - 2} more`}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-auto space-y-2">
-                        {isAttending(event) ? (
-                          <>
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                className="w-full text-white"
-                                onClick={() => navigate(`/events/${event._id}/chat`)}
-                              >
-                                <MessageCircle className="w-4 h-4 mr-2" />
-                                Open Chat
-                              </Button>
-                            </motion.div>
-                            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                              <Button
-                                variant="outline"
-                                className="w-full border-aurora-pink/30 hover:border-aurora-pink hover:bg-aurora-pink/10 text-ice-white"
-                                onClick={() => handleLeaveEvent(event._id)}
-                                disabled={loadingStates[`leave-${event._id}`]}
-                              >
-                                {loadingStates[`leave-${event._id}`] ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Leaving...
-                                  </>
-                                ) : 'Leave Event'}
-                              </Button>
-                            </motion.div>
-                          </>
-                        ) : (
-                          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                            <Button
-                              className="w-full text-white"
-                              onClick={() => handleJoinEvent(event._id)}
-                              disabled={event.attendees.length >= event.maxAttendees || loadingStates[event._id]}
-                            >
-                              {loadingStates[event._id] ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Joining...
-                                </>
-                              ) : event.attendees.length >= event.maxAttendees ? 'Event Full' : 'Join Event'}
-                            </Button>
-                          </motion.div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        )}
-
-        {/* Navigation Links */}
-        <div className="mt-8 flex justify-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/afterglow')}>
-            View Afterglow
+          <Button variant="outline" onClick={fetchEvents}>
+            Reset
           </Button>
         </div>
-      </div>
 
-      {/* Attendee Modal */}
-      {selectedEventForAttendees && (
-        <AttendeeModal
-          open={Boolean(selectedEventForAttendees)}
-          onClose={() => setSelectedEventForAttendees(null)}
-          attendees={selectedEventForAttendees.attendees}
-          eventTitle={selectedEventForAttendees.title}
-        />
-      )}
+        {/* Category Filter */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {['all', 'concert', 'travel', 'trekking'].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-4 py-2 rounded-full text-sm font-medium ${categoryFilter === cat
+                  ? 'bg-white text-black'
+                  : 'bg-[#1a1a1a] text-white border border-[#2a2a2a] hover:bg-[#222]'
+                }`}
+            >
+              {cat.charAt(0).toUpperCase() + cat.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          {filteredEvents.map(event => (
+            <motion.div
+              key={event._id}
+              whileHover={{ y: -8, scale: 1.03 }}
+              transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            >
+              <Card
+                className={`bg-white shadow-md border border-gray-200 flex flex-col h-full overflow-hidden transition-all duration-300 ${event.visibility === 'public'
+                    ? 'hover:shadow-green-200 hover:shadow-2xl'
+                    : 'hover:shadow-red-200 hover:shadow-2xl'
+                  }`}
+              >
+                {event.imageUrl && (
+                  <div className="overflow-hidden">
+                    <motion.img
+                      src={event.imageUrl}
+                      alt={event.title}
+                      className="w-full h-40 object-cover"
+                      whileHover={{ scale: 1.08 }}
+                      transition={{ duration: 0.4 }}
+                    />
+                  </div>
+                )}
+
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>{event.title}</CardTitle>
+
+                    <span
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${event.visibility === 'public'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-red-100 text-red-700'
+                        }`}
+                    >
+                      {event.visibility === 'public'
+                        ? <Globe className="w-3 h-3" />
+                        : <Lock className="w-3 h-3" />}
+                      {event.visibility}
+                    </span>
+                  </div>
+
+                  <CardDescription className="line-clamp-2">
+                    {event.description}
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="flex-1 flex flex-col">
+                  <div className="space-y-2 text-sm text-gray-600 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      {formatDate(event.date)}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      {event.location}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      {event.attendees.length} / {event.maxAttendees}
+                    </div>
+                  </div>
+
+                  <div className="mt-auto space-y-2">
+                    {isAttending(event) ? (
+                      <>
+                        <Button
+                          className="w-full bg-black text-white hover:bg-gray-800"
+                          onClick={() =>
+                            navigate(`/events/${event._id}/chat`)
+                          }
+                        >
+                          <MessageCircle className="w-4 h-4 mr-2" />
+                          Open Chat
+                        </Button>
+
+                        {isCreator(event) ? (
+                          <>
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() =>
+                                navigate(`/events/${event._id}/manage`)
+                              }
+                            >
+                              Manage Requests
+                            </Button>
+
+                            <Button
+                              variant="destructive"
+                              className="w-full"
+                              onClick={() =>
+                                handleDeleteEvent(event._id)
+                              }
+                            >
+                              Delete Event
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() =>
+                              handleLeaveEvent(event._id)
+                            }
+                          >
+                            Leave Event
+                          </Button>
+                        )}
+                      </>
+                    ) : hasRequested(event) ? (
+                      <Button disabled className="w-full">
+                        Pending Approval ⏳
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full bg-black text-white hover:bg-gray-800"
+                        onClick={() => handleJoinEvent(event)}
+                        disabled={
+                          loadingStates[event._id] ||
+                          event.attendees.length >= event.maxAttendees
+                        }
+                      >
+                        {event.attendees.length >= event.maxAttendees
+                          ? "Event Full"
+                          : loadingStates[event._id]
+                            ? "Joining..."
+                            : event.visibility === 'private'
+                              ? "Request / Join"
+                              : "Join Event"}
+                      </Button>
+                    )}
+                  </div>
+
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
     </div>
   );
 };

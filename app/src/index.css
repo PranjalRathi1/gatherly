@@ -2,59 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===============================
+   THEME VARIABLES (SOLID COLORS)
+   =============================== */
+
 @layer base {
   :root {
-    --background: 222 47% 11%;     /* Dark Blue Background */
-    --foreground: 210 40% 98%;     /* Very Light Blue/White Text */
-    
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    
-    --primary: 221 83% 53%;        /* Hard Vibrant Blue */
-    --primary-foreground: 210 40% 98%; /* White text on blue button */
-    
-    --secondary: 217 33% 17%;      /* Darker Blue for secondary actions */
-    --secondary-foreground: 210 40% 98%;
-    
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 221 83% 53%;
-    
-    --radius: 0.5rem;
-  }
+    --background: 0 0% 6%;
+    --foreground: 0 0% 95%;
 
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 221 83% 53%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 65%;
+
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 95%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 80%;
+
+    --radius: 0.5rem;
   }
 }
 
@@ -62,7 +44,49 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
+
+/* ===============================
+   SOLID BACKGROUND IMAGE
+   =============================== */
+
+.events-page,
+.chat-page {
+  position: relative;
+  min-height: 100vh;
+  background: url('/background.jpg') no-repeat center center fixed;
+  background-size: cover;
+}
+
+/* Dark overlay */
+.events-page::before,
+.chat-page::before {
+  content: "";
+  position: fixed;
+  /* IMPORTANT */
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: -1;
+  /* IMPORTANT */
+  pointer-events: none;
+  /* CRITICAL FIX */
+}
+
+
+/* Ensure content stays above overlay */
+.events-page>* .chat-page>* {
+  position: relative;
+  z-index: 1;
+}
+
+
+/* ===============================
+   REMOVE OLD GRADIENT LOGIC
+   =============================== */
+
+/* DELETE any .events-page.all, .concert, .travel etc.
+   No gradients. Solid only. */

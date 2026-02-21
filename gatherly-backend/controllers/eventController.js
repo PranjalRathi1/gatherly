@@ -1,13 +1,21 @@
-const { Event, User } = require('../models');
+const { Event } = require('../models');
 
-// @desc    Create new event
-// @route   POST /api/events
-// @access  Private
+/* =====================================================
+   CREATE EVENT
+===================================================== */
 const createEvent = async (req, res) => {
   try {
-    const { title, description, date, location, maxAttendees, category } = req.body;
-
-    console.log('📝 Creating event:', { title, date: req.body.date, userId: req.userId });
+    const {
+      title,
+      description,
+      date,
+      location,
+      maxAttendees,
+      category,
+      visibility,
+      joinCode,
+      imageUrl
+    } = req.body;
 
     const event = await Event.create({
       title,
@@ -17,99 +25,198 @@ const createEvent = async (req, res) => {
       maxAttendees: maxAttendees || 50,
       category: category || 'concert',
       creator: req.userId,
-      attendees: [req.userId] // Creator automatically joins
+      attendees: [req.userId],
+      visibility: visibility || 'public',
+      joinCode: visibility === 'private' ? joinCode : null,
+      imageUrl: imageUrl || '',
+      joinRequests: []
     });
 
-    // Populate creator info
     await event.populate('creator', 'username email');
+    await event.populate('attendees', 'username email');
 
-    res.status(201).json({
-      message: 'Event created successfully',
-      event
-    });
+    res.status(201).json(event);
+
   } catch (error) {
     console.error('Create event error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Get all events
-// @route   GET /api/events
-// @access  Public
+/* =====================================================
+   GET ALL EVENTS
+===================================================== */
 const getAllEvents = async (req, res) => {
   try {
-    const events = await Event.find()
+    const events = await Event.find({
+      $or: [
+        { visibility: 'public' },
+        { creator: req.userId },
+        { attendees: req.userId }
+      ]
+    })
       .populate('creator', 'username email')
-      .populate('attendees', 'username')
-      .sort({ createdAt: -1 });
+      .populate('attendees', 'username email');
 
     res.json(events);
+
   } catch (error) {
     console.error('Get all events error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Get single event
-// @route   GET /api/events/:id
-// @access  Public
+/* =====================================================
+   GET EVENT BY ID
+===================================================== */
 const getEventById = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id)
       .populate('creator', 'username email')
-      .populate('attendees', 'username email');
+      .populate('attendees', 'username email')
+      .populate('joinRequests', 'username email');
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
     res.json(event);
+
   } catch (error) {
     console.error('Get event error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Join event
-// @route   POST /api/events/:id/join
-// @access  Private
+/* =====================================================
+   JOIN EVENT
+===================================================== */
 const joinEvent = async (req, res) => {
   try {
+    const { joinCode } = req.body;
     const event = await Event.findById(req.params.id);
 
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    // Check if user is already attending
-    if (event.attendees.includes(req.userId)) {
-      return res.status(400).json({ message: 'You are already attending this event' });
+    if (event.attendees.some(id => id.toString() === req.userId)) {
+      return res.status(400).json({ message: 'Already attending this event' });
     }
 
-    // Check if event is full
     if (event.attendees.length >= event.maxAttendees) {
       return res.status(400).json({ message: 'Event is full' });
     }
 
-    // Add user to attendees
-    event.attendees.push(req.userId);
-    await event.save();
+    if (event.visibility === 'public') {
+      event.attendees.push(req.userId);
+      await event.save();
+    } else {
+      if (joinCode && joinCode === event.joinCode) {
+        event.attendees.push(req.userId);
+        await event.save();
+      } else {
+        if (!event.joinRequests.some(id => id.toString() === req.userId)) {
+          event.joinRequests.push(req.userId);
+          await event.save();
+        }
+        return res.json({ message: 'Join request sent. Awaiting approval.' });
+      }
+    }
 
-    await event.populate('attendees', 'username');
+    await event.populate('creator', 'username email');
+    await event.populate('attendees', 'username email');
 
-    res.json({
-      message: 'Successfully joined event',
-      event
-    });
+    res.json(event);
+
   } catch (error) {
     console.error('Join event error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Leave event
-// @route   POST /api/events/:id/leave
-// @access  Private
+/* =====================================================
+   APPROVE JOIN REQUEST
+===================================================== */
+const approveJoinRequest = async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+
+    const event = await Event.findById(id);
+
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (event.creator.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    if (!event.joinRequests.some(uid => uid.toString() === userId)) {
+      return res.status(400).json({ message: 'No such join request' });
+    }
+
+    if (event.attendees.length >= event.maxAttendees) {
+      return res.status(400).json({ message: 'Event is full' });
+    }
+
+    event.attendees.push(userId);
+    event.joinRequests = event.joinRequests.filter(
+      uid => uid.toString() !== userId
+    );
+
+    await event.save();
+
+    await event.populate('creator', 'username email');
+    await event.populate('attendees', 'username email');
+    await event.populate('joinRequests', 'username email');
+
+    res.json(event);
+
+  } catch (error) {
+    console.error('Approve request error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/* =====================================================
+   REJECT JOIN REQUEST
+===================================================== */
+const rejectJoinRequest = async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+
+    const event = await Event.findById(id);
+
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (event.creator.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    event.joinRequests = event.joinRequests.filter(
+      uid => uid.toString() !== userId
+    );
+
+    await event.save();
+
+    await event.populate('creator', 'username email');
+    await event.populate('attendees', 'username email');
+    await event.populate('joinRequests', 'username email');
+
+    res.json(event);
+
+  } catch (error) {
+    console.error('Reject request error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/* =====================================================
+   LEAVE EVENT
+===================================================== */
 const leaveEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -118,32 +225,30 @@ const leaveEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    // Check if user is attending
-    if (!event.attendees.includes(req.userId)) {
+    if (!event.attendees.some(id => id.toString() === req.userId)) {
       return res.status(400).json({ message: 'You are not attending this event' });
     }
 
-    // Remove user from attendees
     event.attendees = event.attendees.filter(
-      attendee => attendee.toString() !== req.userId
+      id => id.toString() !== req.userId
     );
+
     await event.save();
 
-    await event.populate('attendees', 'username');
+    await event.populate('creator', 'username email');
+    await event.populate('attendees', 'username email');
 
-    res.json({
-      message: 'Successfully left event',
-      event
-    });
+    res.json(event);
+
   } catch (error) {
     console.error('Leave event error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Delete event
-// @route   DELETE /api/events/:id
-// @access  Private
+/* =====================================================
+   DELETE EVENT
+===================================================== */
 const deleteEvent = async (req, res) => {
   try {
     const event = await Event.findById(req.params.id);
@@ -152,17 +257,41 @@ const deleteEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    // Check if user is the creator
     if (event.creator.toString() !== req.userId) {
-      return res.status(403).json({ message: 'Not authorized to delete this event' });
+      return res.status(403).json({ message: 'Not authorized' });
     }
 
     await Event.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Event deleted successfully' });
+
   } catch (error) {
     console.error('Delete event error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/* =====================================================
+   GET EVENT BY JOIN CODE
+===================================================== */
+const getEventByCode = async (req, res) => {
+  try {
+    const event = await Event.findOne({
+      joinCode: req.params.joinCode,
+      visibility: 'private'
+    })
+      .populate('creator', 'username email')
+      .populate('attendees', 'username email');
+
+    if (!event) {
+      return res.status(404).json({ message: 'Invalid join code' });
+    }
+
+    res.json(event);
+
+  } catch (error) {
+    console.error('Get by code error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -172,5 +301,8 @@ module.exports = {
   getEventById,
   joinEvent,
   leaveEvent,
-  deleteEvent
+  deleteEvent,
+  approveJoinRequest,
+  rejectJoinRequest,
+  getEventByCode
 };

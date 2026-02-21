@@ -1,6 +1,6 @@
 import api from './axios';
 
-export interface Afterglow {
+export interface AfterglowData {
     _id: string;
     title: string;
     content: string;
@@ -32,22 +32,22 @@ export interface CreateAfterglowData {
 }
 
 export const afterglowApi = {
-    getAllAfterglows: async (): Promise<Afterglow[]> => {
+    getAllAfterglows: async (): Promise<AfterglowData[]> => {
         const response = await api.get('/afterglows');  // Using new /afterglows endpoint
         return response.data;
     },
 
-    getAfterglowById: async (id: string): Promise<Afterglow> => {
+    getAfterglowById: async (id: string): Promise<AfterglowData> => {
         const response = await api.get(`/afterglows/${id}`);
         return response.data;
     },
 
-    createAfterglow: async (data: CreateAfterglowData): Promise<Afterglow> => {
+    createAfterglow: async (data: CreateAfterglowData): Promise<AfterglowData> => {
         const response = await api.post('/afterglows', data);
         return response.data.afterglow;  // Backend returns { message, afterglow }
     },
 
-    updateAfterglow: async (id: string, data: CreateAfterglowData): Promise<Afterglow> => {
+    updateAfterglow: async (id: string, data: CreateAfterglowData): Promise<AfterglowData> => {
         const response = await api.put(`/afterglows/${id}`, data);
         return response.data.afterglow;  // Backend returns { message, afterglow }
     },
