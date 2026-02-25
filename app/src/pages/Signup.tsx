@@ -1,0 +1,251 @@
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/authStore';
+import { authApi } from '@/api/auth';
+import { generateCuteUsername } from '@/utils/usernameGenerator';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import UsernamePicker from '@/components/UsernamePicker';
+import AuthLayout from '@/components/AuthLayout';
+import WelcomeDialog from '@/components/WelcomeDialog';
+
+const Signup = () => {
+  const navigate = useNavigate();
+  const { login } = useAuthStore();
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    displayName: ''
+  });
+  const [error, setError] = useState<{ message: string; field?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showUsernamePicker, setShowUsernamePicker] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Generate cute username on component mount
+  useEffect(() => {
+    const cuteUsername = generateCuteUsername();
+    setFormData(prev => ({ ...prev, displayName: cuteUsername }));
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const regenerateDisplayName = () => {
+    const newName = generateCuteUsername();
+    setFormData(prev => ({ ...prev, displayName: newName }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    // Validation
+    if (formData.password !== formData.confirmPassword) {
+      setError({ message: 'Passwords do not match', field: 'confirmPassword' });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError({ message: 'Password must be at least 6 characters', field: 'password' });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await authApi.signup({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        displayName: formData.displayName
+      });
+
+      // Auto-login
+      login(response.user, response.token);
+
+      // Show welcome dialog
+      setShowWelcome(true);
+
+    } catch (err: any) {
+      const errorData = err.response?.data;
+      setError({
+        message: errorData?.message || 'Failed to create account',
+        field: errorData?.field
+      });
+      console.error('Signup error:', errorData);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <AuthLayout
+        title="Create Account"
+        description="Join Gatherly and start connecting 🐧"
+      >
+        {error && (
+          <Alert className="mb-4 bg-aurora-pink/10 border-aurora-pink/30">
+            <AlertTitle className="text-ice-white font-semibold">
+              {error.field ? `${error.field.charAt(0).toUpperCase() + error.field.slice(1)} Error` : 'Signup Failed'}
+            </AlertTitle>
+            <AlertDescription className="text-ice-gray">
+              {error.message}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Cute Display Name */}
+          <div className="space-y-2 p-3 bg-arctic-mid/30 rounded-lg border border-aurora-cyan/30">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="displayName" className="flex items-center gap-2 text-ice-white">
+                <Sparkles className="w-4 h-4 text-aurora-cyan" />
+                Your Cute Display Name
+              </Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={regenerateDisplayName}
+                className="text-xs text-aurora-cyan hover:text-aurora-cyan/80 hover:bg-aurora-cyan/10"
+              >
+                🔄 Regenerate
+              </Button>
+            </div>
+            <Input
+              id="displayName"
+              name="displayName"
+              type="text"
+              value={formData.displayName}
+              onChange={handleChange}
+              className="bg-arctic-deep border-aurora-cyan/30 text-ice-white font-medium"
+              required
+            />
+            <p className="text-xs text-ice-gray">
+              This will be your unique cute name! You can change it later.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="username" className="text-ice-white">Username</Label>
+            <Input
+              id="username"
+              name="username"
+              type="text"
+              placeholder="Enter your username"
+              value={formData.username}
+              onChange={handleChange}
+              required
+              minLength={3}
+              className="bg-arctic-mid border-ice-dark/30 text-ice-white placeholder:text-ice-dark font-mono"
+            />
+
+            {/* Username Picker Toggle */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUsernamePicker(!showUsernamePicker)}
+              className="w-full border-aurora-cyan/30 hover:border-aurora-cyan hover:bg-aurora-cyan/10 text-aurora-cyan"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Generate Cool Username
+              {showUsernamePicker ? <ChevronUp className="w-4 h-4 ml-auto" /> : <ChevronDown className="w-4 h-4 ml-auto" />}
+            </Button>
+
+            {showUsernamePicker && (
+              <UsernamePicker
+                currentUsername={formData.username}
+                onSelect={(username) => {
+                  setFormData({ ...formData, username });
+                }}
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-ice-white">Email</Label>
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              className="bg-arctic-mid border-ice-dark/30 text-ice-white placeholder:text-ice-dark"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-ice-white">Password</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              minLength={6}
+              className="bg-arctic-mid border-ice-dark/30 text-ice-white placeholder:text-ice-dark"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword" className="text-ice-white">Confirm Password</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              placeholder="Confirm your password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              className="bg-arctic-mid border-ice-dark/30 text-ice-white placeholder:text-ice-dark"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full font-semibold"
+            disabled={isLoading}
+          >
+            {isLoading ? 'Creating Account...' : 'Sign Up'}
+          </Button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-ice-gray">
+          Already have an account?{' '}
+          <Link to="/login" className="text-aurora-cyan hover:text-aurora-purple hover:underline font-semibold">
+            Log in
+          </Link>
+        </p>
+      </AuthLayout>
+
+      {/* Welcome Dialog */}
+      <WelcomeDialog
+        username={formData.username}
+        displayName={formData.displayName}
+        open={showWelcome}
+        onClose={() => {
+          setShowWelcome(false);
+          navigate('/events');
+        }}
+      />
+    </>
+  );
+};
+
+export default Signup;
