@@ -19,7 +19,10 @@ const server = http.createServer(app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: true,
+    origin: [
+      "http://localhost:5173",
+      "https://gatherly-murex.vercel.app"
+    ],
     credentials: true
   }
 });
@@ -36,7 +39,10 @@ connectDB()
 
 // Middleware
 app.use(cors({
-  origin: true,
+  origin: [
+    "http://localhost:5173",
+    "https://gatherly-murex.vercel.app"
+  ],
   credentials: true
 }));
 app.use(express.json());
