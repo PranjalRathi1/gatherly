@@ -1,4 +1,3 @@
-
 const seedTestEvent = require('./utils/seedTestEvent');
 
 const express = require('express');
@@ -16,39 +15,69 @@ const socketHandler = require('./socket/socketHandler');
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.io
+// ✅ Allowed Origins Logic (Production Safe + Preview Safe)
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL // production URL from Render env
+];
+
+// CORS configuration for Express
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like Postman, curl)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost
+    if (origin.includes("localhost")) {
+      return callback(null, true);
+    }
+
+    // Allow main production frontend
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow any Vercel preview deployment
+    if (origin.includes("vercel.app")) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true
+}));
+
+// Initialize Socket.io with same CORS logic
 const io = new Server(server, {
   cors: {
-    origin: [
-      "http://localhost:5173",
-      "https://gatherly-murex.vercel.app"
-    ],
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+
+      if (
+        origin.includes("localhost") ||
+        origin.includes("vercel.app") ||
+        allowedOrigins.includes(origin)
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true
   }
 });
 
 // Connect to MongoDB AND seed after successful connection
 connectDB()
-  .then(() => {
-    return seedTestEvent();
-  })
+  .then(() => seedTestEvent())
   .catch((err) => {
     console.error("Database connection failed:", err);
   });
 
-
-// Middleware
-app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://gatherly-murex.vercel.app"
-  ],
-  credentials: true
-}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware (development)
+// Request logging middleware (development only)
 if (process.env.NODE_ENV === 'development') {
   app.use((req, res, next) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
@@ -80,7 +109,7 @@ process.on('SIGINT', () => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  console.error('Error:', err.message);
   res.status(500).json({
     message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
@@ -99,5 +128,3 @@ server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
-
-
