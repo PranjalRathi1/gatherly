@@ -54,7 +54,7 @@ const Afterglow = () => {
 
             const myEvents = data.filter(event =>
                 event.attendees?.some(attendee =>
-                    attendee.id === user?.id
+                    attendee?.id && String(attendee.id) === String(user?.id)
                 )
             );
 
@@ -72,11 +72,11 @@ const Afterglow = () => {
         try {
             setIsLoading(true);
             const data = await afterglowApi.getAllAfterglows();
-            setAfterglows(data);
+            setAfterglows(data || []);
             setError('');
         } catch (err: any) {
             console.error('Failed to fetch afterglows:', err);
-            setError(err.response?.data?.message || 'Failed to load memories');
+            setError(err?.response?.data?.message || 'Failed to load memories');
         } finally {
             setIsLoading(false);
         }
@@ -84,14 +84,14 @@ const Afterglow = () => {
 
     const syncPendingPosts = async () => {
         const pending = getPendingPosts();
-        if (pending.length === 0) return;
+        if (!pending || pending.length === 0) return;
 
         for (const post of pending) {
             try {
                 const response = await afterglowApi.createAfterglow(post.data);
-                markAsSynced(post.id, response.id);
-            } catch (error) {
-                console.warn(`Failed to sync: ${post.data.title}`);
+                markAsSynced(post.id, response?.id);
+            } catch {
+                console.warn(`Failed to sync: ${post?.data?.title}`);
             }
         }
 
@@ -134,7 +134,7 @@ const Afterglow = () => {
             setFormData({
                 title: afterglow.title,
                 content: afterglow.content,
-                tags: afterglow.tags.join(', '),
+                tags: afterglow.tags?.join(', ') || '',
                 photos: afterglow.photos || [],
                 eventRef: afterglow.eventRef?.id || ''
             });
@@ -175,9 +175,9 @@ const Afterglow = () => {
                 tags: data.tags,
                 photos: data.photos || [],
                 author: {
-                    id: user!.id,
-                    username: user!.username,
-                    email: user!.email,
+                    id: user?.id || '',
+                    username: user?.username || '',
+                    email: user?.email || '',
                     displayName: user?.displayName
                 },
                 createdAt: new Date().toISOString(),
@@ -217,7 +217,7 @@ const Afterglow = () => {
             }
 
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to save Afterglow');
+            setError(err?.response?.data?.message || 'Failed to save Afterglow');
         } finally {
             setIsSubmitting(false);
             setTimeout(() => setSuccessMessage(''), 5000);
@@ -231,7 +231,7 @@ const Afterglow = () => {
             await afterglowApi.deleteAfterglow(afterglowId);
             fetchAfterglows();
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to delete Afterglow');
+            setError(err?.response?.data?.message || 'Failed to delete Afterglow');
         }
     };
 
@@ -243,7 +243,7 @@ const Afterglow = () => {
         });
 
     const isAuthor = (afterglow: AfterglowData) =>
-        afterglow.author.id === user?.id;
+        afterglow?.author?.id && String(afterglow.author.id) === String(user?.id);
 
     if (isLoading) {
         return (
@@ -272,31 +272,47 @@ const Afterglow = () => {
     }
 
     return (
+
         <div className="min-h-screen bg-gradient-to-br from-arctic-deepest via-arctic-deep to-arctic-mid">
             {/* Header */}
             <header className="bg-arctic-deep/80 backdrop-blur-xl shadow-lg shadow-aurora-cyan/5 border-b border-aurora-cyan/20 sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => navigate('/events')} className="text-ice-white hover:bg-aurora-cyan/10">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate('/events')}
+                            className="text-ice-white hover:bg-aurora-cyan/10"
+                        >
                             <ArrowLeft className="w-4 h-4 mr-2" />
                             Back to Events
                         </Button>
+
                         <h1 className="text-3xl font-display font-bold bg-gradient-to-r from-aurora-cyan via-aurora-purple to-aurora-pink bg-clip-text text-transparent">
                             ✨ Afterglow
                         </h1>
                     </div>
+
                     <div className="flex items-center gap-4">
-                        <span className="text-ice-gray font-body hidden sm:inline">Welcome, <strong className="text-ice-white">{user?.displayName || user?.username}</strong>!</span>
+                        <span className="text-ice-gray font-body hidden sm:inline">
+                            Welcome,{" "}
+                            <strong className="text-ice-white">
+                                {user?.displayName || user?.username}
+                            </strong>!
+                        </span>
                     </div>
                 </div>
             </header>
 
             <div className="max-w-7xl mx-auto px-4 py-8">
+
                 {/* Offline Mode Banner */}
                 {!isOnline && (
                     <Alert className="mb-6 bg-aurora-pink/10 border-aurora-pink/30">
                         <WifiOff className="w-4 h-4 text-aurora-pink" />
-                        <AlertTitle className="text-ice-white">Offline Mode</AlertTitle>
+                        <AlertTitle className="text-ice-white">
+                            Offline Mode
+                        </AlertTitle>
                         <AlertDescription className="text-ice-gray">
                             Your memories will be saved locally and synced when connection returns.
                         </AlertDescription>
@@ -307,21 +323,29 @@ const Afterglow = () => {
                 {successMessage && (
                     <Alert className="mb-6 bg-aurora-cyan/10 border-aurora-cyan/30">
                         <Sparkles className="w-4 h-4 text-aurora-cyan" />
-                        <AlertDescription className="text-ice-white">{successMessage}</AlertDescription>
+                        <AlertDescription className="text-ice-white">
+                            {successMessage}
+                        </AlertDescription>
                     </Alert>
                 )}
 
                 {/* Error Message */}
                 {error && (
                     <Alert className="mb-6 bg-aurora-pink/10 border-aurora-pink/30">
-                        <AlertDescription className="text-ice-white">{error}</AlertDescription>
+                        <AlertDescription className="text-ice-white">
+                            {error}
+                        </AlertDescription>
                     </Alert>
                 )}
 
                 {/* Actions Bar */}
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-display font-semibold text-ice-white">Shared Memories</h2>
+                    <h2 className="text-2xl font-display font-semibold text-ice-white">
+                        Shared Memories
+                    </h2>
+
                     <div className="flex gap-3">
+
                         {pendingCount > 0 && (
                             <Button
                                 variant="outline"
@@ -333,6 +357,7 @@ const Afterglow = () => {
                                 Retry Sync ({pendingCount})
                             </Button>
                         )}
+
                         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                             <DialogTrigger asChild>
                                 <Button
@@ -343,15 +368,22 @@ const Afterglow = () => {
                                     Write Afterglow
                                 </Button>
                             </DialogTrigger>
+
                             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-arctic-deep border-aurora-cyan/30">
                                 <DialogHeader>
                                     <DialogTitle className="text-ice-white font-display text-2xl">
-                                        {editingAfterglow ? 'Edit Memory' : 'Share Your Afterglow'}
+                                        {editingAfterglow
+                                            ? "Edit Memory"
+                                            : "Share Your Afterglow"}
                                     </DialogTitle>
+
                                     <DialogDescription className="text-ice-gray">
-                                        {editingAfterglow ? 'Update your memory.' : 'Relive and share your favorite event moments.'}
+                                        {editingAfterglow
+                                            ? "Update your memory."
+                                            : "Relive and share your favorite event moments."}
                                     </DialogDescription>
                                 </DialogHeader>
+
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="title" className="text-ice-white">Title</Label>
@@ -446,12 +478,16 @@ const Afterglow = () => {
                         className="text-center py-20"
                     >
                         <div className="text-8xl mb-6">🐧</div>
+
                         <h3 className="text-2xl font-display font-semibold text-ice-white mb-2">
                             No memories shared yet...
                         </h3>
+
                         <p className="text-ice-gray mb-6 max-w-md mx-auto">
-                            Be the first to share an Afterglow! Relive your favorite event moments and let them glow forever. ✨
+                            Be the first to share an Afterglow! Relive your favorite
+                            event moments and let them glow forever. ✨
                         </p>
+
                         <Button
                             onClick={() => setDialogOpen(true)}
                             className="text-white"
@@ -475,7 +511,7 @@ const Afterglow = () => {
                     >
                         {afterglows.map((afterglow: any) => (
                             <motion.div
-                                key={afterglow._id}
+                                key={afterglow?._id || afterglow?.id}
                                 variants={{
                                     hidden: { opacity: 0, y: 20 },
                                     visible: { opacity: 1, y: 0 }
@@ -484,54 +520,65 @@ const Afterglow = () => {
                                 whileTap={{ scale: 0.98 }}
                             >
                                 <Card className="flex flex-col bg-arctic-deep/90 backdrop-blur-md shadow-xl hover:shadow-2xl hover:shadow-aurora-purple/20 transition-shadow duration-300 border border-aurora-purple/30 h-full overflow-hidden">
-                                    {/* Photo Grid */}
-                                    {afterglow.photos && afterglow.photos.length > 0 && (
-                                        <PhotoGrid photos={afterglow.photos} showLightbox />
+
+                                    {afterglow?.photos?.length > 0 && (
+                                        <PhotoGrid
+                                            photos={afterglow.photos}
+                                            showLightbox
+                                        />
                                     )}
 
                                     <CardHeader>
                                         <CardTitle className="text-lg font-display text-ice-white line-clamp-2">
-                                            {afterglow.title}
-                                            {afterglow.isPending && (
+                                            {afterglow?.title}
+
+                                            {afterglow?.isPending && (
                                                 <span className="ml-2 text-xs bg-amber-500/20 text-amber-200 px-2 py-1 rounded">
                                                     ⏳ Pending Sync
                                                 </span>
                                             )}
                                         </CardTitle>
-                                        {/* Event Badge */}
-                                        {afterglow.eventRef && (
+
+                                        {afterglow?.eventRef && (
                                             <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-aurora-purple/20 rounded-full text-aurora-purple text-sm border border-aurora-purple/30">
                                                 <Ticket className="w-3 h-3" />
-                                                <span>{afterglow.eventRef.title}</span>
+                                                <span>
+                                                    {afterglow?.eventRef?.title || ""}
+                                                </span>
                                             </div>
                                         )}
+
                                         <CardDescription className="flex items-center gap-4 text-sm text-ice-gray mt-2">
                                             <span className="flex items-center gap-1">
                                                 <User className="w-3 h-3" />
-                                                {afterglow.author.displayName || afterglow.author.username}
+                                                {afterglow?.author?.displayName ||
+                                                    afterglow?.author?.username}
                                             </span>
+
                                             <span className="flex items-center gap-1">
                                                 <Calendar className="w-3 h-3" />
-                                                {formatDate(afterglow.createdAt)}
+                                                {formatDate(afterglow?.createdAt)}
                                             </span>
                                         </CardDescription>
                                     </CardHeader>
 
                                     <CardContent className="flex-1 flex flex-col">
                                         <p className="text-ice-gray line-clamp-4 mb-4 flex-1 font-body">
-                                            {afterglow.content}
+                                            {afterglow?.content}
                                         </p>
 
-                                        {afterglow.tags.length > 0 && (
+                                        {afterglow?.tags?.length > 0 && (
                                             <div className="flex flex-wrap gap-2 mb-4">
-                                                {afterglow.tags.map((tag: string, index: number) => (
-                                                    <span
-                                                        key={index}
-                                                        className="px-2 py-1 bg-aurora-purple/20 text-aurora-purple text-xs rounded-full border border-aurora-purple/30"
-                                                    >
-                                                        {tag}
-                                                    </span>
-                                                ))}
+                                                {afterglow.tags?.map(
+                                                    (tag: string, index: number) => (
+                                                        <span
+                                                            key={index}
+                                                            className="px-2 py-1 bg-aurora-purple/20 text-aurora-purple text-xs rounded-full border border-aurora-purple/30"
+                                                        >
+                                                            {tag}
+                                                        </span>
+                                                    )
+                                                )}
                                             </div>
                                         )}
 
@@ -541,16 +588,24 @@ const Afterglow = () => {
                                                     variant="outline"
                                                     size="sm"
                                                     className="flex-1 border-aurora-cyan/30 hover:bg-aurora-cyan/10 text-ice-white"
-                                                    onClick={() => handleOpenDialog(afterglow)}
+                                                    onClick={() =>
+                                                        handleOpenDialog(afterglow)
+                                                    }
                                                 >
                                                     <Edit className="w-4 h-4 mr-2" />
                                                     Edit
                                                 </Button>
+
                                                 <Button
                                                     variant="destructive"
                                                     size="sm"
                                                     className="flex-1"
-                                                    onClick={() => handleDelete(afterglow._id)}
+                                                    onClick={() =>
+                                                        handleDelete(
+                                                            afterglow?._id ||
+                                                            afterglow?.id
+                                                        )
+                                                    }
                                                 >
                                                     <Trash2 className="w-4 h-4 mr-2" />
                                                     Delete
@@ -569,3 +624,4 @@ const Afterglow = () => {
 };
 
 export default Afterglow;
+

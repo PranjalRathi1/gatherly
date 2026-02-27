@@ -28,7 +28,6 @@ const Profile = () => {
     const [achievements, setAchievements] = useState<Achievement[]>([]);
     const [editData, setEditData] = useState({ displayName: '', avatar: '' });
 
-    // ✅ FIXED
     const isOwnProfile = !userId || userId === currentUser?.id;
 
     useEffect(() => {
@@ -55,7 +54,6 @@ const Profile = () => {
 
             const allEvents = await eventsApi.getAllEvents();
 
-            // ✅ FIXED
             const vibe = calculateVibeProfile(data.user.id, allEvents);
             setVibeProfile(vibe);
 
@@ -115,6 +113,11 @@ const Profile = () => {
         vibePercentages: { party: 0, adventure: 0, culture: 0, social: 0, explorer: 0 },
         totalScore: 0,
     };
+
+    /* ✅ SAFETY FIX — DO NOT REMOVE */
+    const safeJoinedEvents =
+        profile.joinedEvents?.filter((event: any) => event && event._id) || [];
+
     return (
         <div className="min-h-screen transition-colors duration-500">
 
@@ -334,29 +337,29 @@ const Profile = () => {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-black dark:text-white">
                             <Calendar className="w-5 h-5 text-indigo-500" />
-                            Joined Events ({profile.joinedEvents.length})
+                            Joined Events ({safeJoinedEvents.length})
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {profile.joinedEvents.length === 0 ? (
+                        {safeJoinedEvents.length === 0 ? (
                             <p className="text-gray-500 dark:text-gray-400 text-center py-4">
                                 No events joined yet 🐧
                             </p>
                         ) : (
                             <div className="space-y-3">
-                                {profile.joinedEvents.slice(0, 5).map((event: any) => (
+                                {safeJoinedEvents.slice(0, 5).map((event: any) => (
                                     <div
-                                        key={event._id}
+                                        key={event?._id}
                                         className="p-3 rounded-lg bg-gray-100/70 dark:bg-zinc-800/60 cursor-pointer hover:scale-[1.02] transition"
                                         onClick={() =>
-                                            navigate(`/events/${event._id}/chat`)
+                                            navigate(`/events/${event?._id}/chat`)
                                         }
                                     >
                                         <h3 className="font-semibold text-black dark:text-white">
-                                            {event.title}
+                                            {event?.title}
                                         </h3>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                                            {formatDate(event.date)}
+                                            {formatDate(event?.date)}
                                         </p>
                                     </div>
                                 ))}

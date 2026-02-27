@@ -1,7 +1,7 @@
 import api from './axios';
 
 export interface Event {
-  id: string; // ✅ normalized
+  id: string;
   title: string;
   description: string;
   date: string;
@@ -49,14 +49,16 @@ const normalizeEvent = (event: any): Event => ({
     ...event.creator,
     id: event.creator?._id,
   },
-  attendees: event.attendees?.map((a: any) => ({
-    ...a,
-    id: a._id,
-  })) || [],
-  joinRequests: event.joinRequests?.map((jr: any) => ({
-    ...jr,
-    id: jr._id,
-  })) || [],
+  attendees:
+    event.attendees?.map((a: any) => ({
+      ...a,
+      id: a._id,
+    })) || [],
+  joinRequests:
+    event.joinRequests?.map((jr: any) => ({
+      ...jr,
+      id: jr._id,
+    })) || [],
 });
 
 export const eventsApi = {
@@ -87,7 +89,7 @@ export const eventsApi = {
     const response = await api.post(`/events/${id}/join`, { joinCode });
 
     return {
-      ...response.data,
+      message: response.data.message,
       event: normalizeEvent(response.data.event),
     };
   },
@@ -98,29 +100,35 @@ export const eventsApi = {
     const response = await api.post(`/events/${id}/leave`);
 
     return {
-      ...response.data,
+      message: response.data.message,
       event: normalizeEvent(response.data.event),
     };
   },
 
-  approveRequest: async (eventId: string, userId: string) => {
+  approveRequest: async (
+    eventId: string,
+    userId: string
+  ): Promise<{ message: string; event: Event }> => {
     const response = await api.post(
       `/events/${eventId}/approve/${userId}`
     );
 
     return {
-      ...response.data,
+      message: response.data.message,
       event: normalizeEvent(response.data.event),
     };
   },
 
-  rejectRequest: async (eventId: string, userId: string) => {
+  rejectRequest: async (
+    eventId: string,
+    userId: string
+  ): Promise<{ message: string; event: Event }> => {
     const response = await api.post(
       `/events/${eventId}/reject/${userId}`
     );
 
     return {
-      ...response.data,
+      message: response.data.message,
       event: normalizeEvent(response.data.event),
     };
   },

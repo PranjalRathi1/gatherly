@@ -83,20 +83,27 @@ const Events = () => {
 
   const isAttending = (event: Event) => {
     if (!user) return false;
+
     return event.attendees?.some(
-      (a) => a?.id && String(a.id) === String(user.id)
+      (a: any) =>
+        (a?.id && String(a.id) === String(user.id)) ||
+        (a?._id && String(a._id) === String(user.id))
     );
   };
 
   const isCreator = (event: Event) => {
     if (!user) return false;
-    return event.creator?.id && String(event.creator.id) === String(user.id);
+    return (event.creator?.id && String(event.creator.id) === String(user.id)
+    );
   };
 
   const hasRequested = (event: Event) => {
     if (!user) return false;
+
     return event.joinRequests?.some(
-      (id: any) => id && String(id) === String(user.id)
+      (req: any) =>
+        String(req) === String(user.id) ||
+        String(req?._id) === String(user.id)
     );
   };
 
@@ -241,7 +248,6 @@ const Events = () => {
               Welcome <strong className="text-black dark:text-white">{user.username}</strong>
             </span>
 
-            {/* ✅ UPDATED CREATE BUTTON */}
             <Button
               size="sm"
               className="bg-black text-white dark:bg-white dark:text-black"
@@ -254,7 +260,6 @@ const Events = () => {
                   });
                   return;
                 }
-
                 navigate('/events/create');
               }}
             >
@@ -270,15 +275,12 @@ const Events = () => {
               Profile
             </Button>
 
-
             {user.role === 'admin' && (
               <Button
-
                 variant="outline"
                 size="sm"
                 onClick={() => navigate('/admin')}
               >
-
                 Admin Panel
               </Button>
             )}
@@ -402,7 +404,7 @@ const Events = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      {event.attendees.length} / {event.maxAttendees}
+                      {(event.attendees?.length || 0)} / {event.maxAttendees}
                     </div>
                   </div>
 
@@ -455,10 +457,10 @@ const Events = () => {
                         onClick={() => handleJoinEvent(event)}
                         disabled={
                           loadingStates[event.id] ||
-                          event.attendees.length >= event.maxAttendees
+                          (event.attendees?.length || 0) >= event.maxAttendees
                         }
                       >
-                        {event.attendees.length >= event.maxAttendees
+                        {(event.attendees?.length || 0) >= event.maxAttendees
                           ? "Event Full"
                           : loadingStates[event.id]
                             ? "Joining..."

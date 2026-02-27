@@ -13,34 +13,32 @@ const ManageEvent = () => {
     const [loading, setLoading] = useState(true);
 
     const fetchEvent = async () => {
-        const data = await eventsApi.getEventById(id!);
-        setEvent(data);
-        setLoading(false);
+        try {
+            const data = await eventsApi.getEventById(id!);
+            setEvent(data);
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {
         fetchEvent();
     }, []);
 
-    if (loading) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <p className="text-foreground text-lg">Loading...</p>
-        </div>
-    );
-
-    if (!event) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <p className="text-foreground">Event not found</p>
-        </div>
-    );
-
-    if (event.creator.id !== user?.id) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p className="text-foreground">Not authorized</p>
-            </div>
-        );
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
     }
+
+    if (!event) {
+        return <div className="min-h-screen flex items-center justify-center">Event not found</div>;
+    }
+
+    if (!event.creator || event.creator.id !== user?.id) {
+        return <div className="min-h-screen flex items-center justify-center">Not authorized</div>;
+    }
+
+    const safeJoinRequests =
+        event.joinRequests?.filter((reqUser: any) => reqUser && reqUser._id) || [];
 
     const handleApprove = async (userId: string) => {
         await eventsApi.approveRequest(event.id, userId);
@@ -56,63 +54,33 @@ const ManageEvent = () => {
         <div className="min-h-screen px-4 py-10">
             <div className="max-w-3xl mx-auto">
 
-                {/* Header card */}
-                <div className="mb-8 p-6 rounded-xl bg-[#141414] dark:bg-[#0f1115] border border-[#27272a] shadow-sm">
-                    <h1 className="text-2xl font-bold text-foreground mb-1">
-                        Manage Requests
-                    </h1>
-                    <p className="text-muted-foreground text-sm">{event.title}</p>
-                </div>
+                <h1 className="text-2xl font-bold mb-6">Manage Requests</h1>
 
-                {/* Pending requests */}
-                <div className="p-6 rounded-xl bg-[#141414] dark:bg-[#0f1115] border border-[#27272a] shadow-sm">
-                    <h2 className="text-lg font-semibold text-foreground mb-4">
-                        Pending Requests ({event.joinRequests?.length || 0})
-                    </h2>
-
-                    {(event.joinRequests?.length === 0 || !event.joinRequests) && (
-                        <p className="text-muted-foreground text-sm py-4 text-center">
-                            No pending join requests.
-                        </p>
-                    )}
-
+                {safeJoinRequests.length === 0 ? (
+                    <p className="text-center">No pending join requests.</p>
+                ) : (
                     <div className="space-y-3">
-                        {event.joinRequests?.map((reqUser: any) => (
+                        {safeJoinRequests.map((reqUser: any) => (
                             <div
                                 key={reqUser._id}
-                                className="flex justify-between items-center p-4 rounded-lg border border-[#27272a] bg-[#1c1c1f] dark:bg-[#0f1115]"
+                                className="flex justify-between items-center p-4 rounded-lg border"
                             >
-                                <span className="font-medium text-foreground">
-                                    {reqUser.username}
-                                </span>
-
+                                <span>{reqUser.username}</span>
                                 <div className="flex gap-2">
-                                    <Button
-                                        size="sm"
-                                        onClick={() => handleApprove(reqUser._id)}
-                                    >
+                                    <Button size="sm" onClick={() => handleApprove(reqUser._id)}>
                                         Approve
                                     </Button>
-
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleReject(reqUser._id)}
-                                    >
+                                    <Button size="sm" variant="outline" onClick={() => handleReject(reqUser._id)}>
                                         Reject
                                     </Button>
                                 </div>
                             </div>
                         ))}
                     </div>
-                </div>
+                )}
 
-                <Button
-                    className="mt-6"
-                    variant="outline"
-                    onClick={() => navigate('/events')}
-                >
-                    ← Back to Events
+                <Button className="mt-6" variant="outline" onClick={() => navigate('/events')}>
+                    ← Back
                 </Button>
             </div>
         </div>
