@@ -1,4 +1,4 @@
-const seedTestEvent = require('./utils/seedTestEvent');
+//const seedTestEvent = require('./utils/seedTestEvent');
 
 const express = require('express');
 const http = require('http');
