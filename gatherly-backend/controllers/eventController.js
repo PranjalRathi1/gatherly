@@ -131,14 +131,26 @@ const joinEvent = async (req, res) => {
           event.joinRequests.push(req.userId);
           await event.save();
         }
-        return res.json({ message: 'Join request sent. Awaiting approval.' });
+
+        await event.populate('creator', 'username email');
+        await event.populate('attendees', 'username email');
+        await event.populate('joinRequests', 'username email');
+
+        return res.json({
+          message: 'Join request sent. Awaiting approval.',
+          event
+        });
       }
     }
 
     await event.populate('creator', 'username email');
     await event.populate('attendees', 'username email');
+    await event.populate('joinRequests', 'username email');
 
-    res.json(event);
+    res.json({
+      message: 'Joined successfully',
+      event
+    });
 
   } catch (error) {
     console.error('Join event error:', error);
@@ -182,7 +194,10 @@ const approveJoinRequest = async (req, res) => {
     await event.populate('attendees', 'username email');
     await event.populate('joinRequests', 'username email');
 
-    res.json(event);
+    res.json({
+      message: 'Join request approved successfully',
+      event
+    });
 
   } catch (error) {
     console.error('Approve request error:', error);
@@ -217,7 +232,10 @@ const rejectJoinRequest = async (req, res) => {
     await event.populate('attendees', 'username email');
     await event.populate('joinRequests', 'username email');
 
-    res.json(event);
+    res.json({
+      message: 'Join request rejected successfully',
+      event
+    });
 
   } catch (error) {
     console.error('Reject request error:', error);
@@ -236,6 +254,15 @@ const leaveEvent = async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
+    // 🔍 DEBUG LOGS (KEPT EXACTLY AS YOU HAD THEM)
+    console.log("====== LEAVE DEBUG ======");
+    console.log("req.userId:", req.userId);
+    console.log(
+      "attendees:",
+      event.attendees.map(a => a.toString())
+    );
+    console.log("=========================");
+
     if (!event.attendees.some(id => id.toString() === req.userId)) {
       return res.status(400).json({ message: 'You are not attending this event' });
     }
@@ -248,8 +275,12 @@ const leaveEvent = async (req, res) => {
 
     await event.populate('creator', 'username email');
     await event.populate('attendees', 'username email');
+    await event.populate('joinRequests', 'username email');
 
-    res.json(event);
+    res.json({
+      message: 'Left event successfully',
+      event
+    });
 
   } catch (error) {
     console.error('Leave event error:', error);
