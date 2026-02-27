@@ -62,7 +62,7 @@ export const VIBE_CONFIGS: Record<VibeType, VibeConfig> = {
 export function calculateVibeProfile(userId: string, allEvents: Event[]): VibeProfile {
     // Filter events the user has attended
     const attendedEvents = allEvents.filter(event =>
-        event.attendees.some(attendee => attendee._id === userId)
+        event.attendees.some(attendee => attendee.id === userId)
     );
 
     // Initialize scores
