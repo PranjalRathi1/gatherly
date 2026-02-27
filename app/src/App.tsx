@@ -14,10 +14,65 @@ import ManageEvent from "@/pages/ManageEvent";
 import PenguinCompanion from "@/components/PenguinCompanion";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import CreateEvent from "@/pages/CreateEvent";
+import AdminDashboard from "@/pages/AdminDashboard";
+
+import { useEffect, useRef } from "react";
+import authApi from "@/api/auth";
+import { useToast } from "@/hooks/use-toast";
 
 function App() {
   useTheme();
-  const { isAuthenticated } = useAuthStore();
+
+  const { user, setUser, isAuthenticated } = useAuthStore();
+  const { toast } = useToast();
+
+  // Track previous creator status
+  const previousStatus = useRef(user?.creatorRequestStatus);
+
+  /* ==================================================
+     🔥 AUTO ROLE + STATUS REFRESH SYSTEM
+  =================================================== */
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const updatedUser = await authApi.getMe();
+
+        // If status changed → notify user
+        if (
+          previousStatus.current &&
+          previousStatus.current !== updatedUser.creatorRequestStatus
+        ) {
+          if (updatedUser.creatorRequestStatus === "approved") {
+            toast({
+              title: "🎉 Creator Approved!",
+              description: "You can now create events.",
+            });
+          }
+
+          if (updatedUser.creatorRequestStatus === "rejected") {
+            toast({
+              title: "❌ Request Rejected",
+              description: "Your creator access request was rejected.",
+              variant: "destructive",
+            });
+          }
+        }
+
+        // Save new status
+        previousStatus.current = updatedUser.creatorRequestStatus;
+
+        // Update Zustand store (auto unlocks UI)
+        setUser(updatedUser);
+
+      } catch (err) {
+        console.error("User auto-refresh failed");
+      }
+    }, 5000); // check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   return (
     <ErrorBoundary>
@@ -26,16 +81,14 @@ function App() {
         {/* ─── BACKGROUND LAYER ─── */}
         <div className="fixed inset-0 -z-10 pointer-events-none">
 
-          {/* L3 — Neutral Luxury (Light) */}
+          {/* Light Theme */}
           <div className="absolute inset-0 dark:hidden bg-gradient-to-br from-[#f2f2f2] via-[#f5f5f4] to-[#efe5cf]" />
-          {/* Radial highlight — top-left warmth */}
           <div
             className="absolute inset-0 dark:hidden"
             style={{
               background: "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.65), transparent 58%)"
             }}
           />
-          {/* Very subtle dot texture */}
           <svg
             className="absolute inset-0 w-full h-full dark:hidden"
             xmlns="http://www.w3.org/2000/svg"
@@ -49,16 +102,14 @@ function App() {
             <rect width="100%" height="100%" fill="url(#dots-light)" />
           </svg>
 
-          {/* D2 — Midnight Blue (Dark) */}
+          {/* Dark Theme */}
           <div className="absolute inset-0 hidden dark:block bg-gradient-to-br from-[#0f172a] via-[#111827] to-[#1e293b]" />
-          {/* Radial blue lighting — top-right */}
           <div
             className="absolute inset-0 hidden dark:block"
             style={{
               background: "radial-gradient(circle at 80% 20%, rgba(59,130,246,0.15), transparent 58%)"
             }}
           />
-          {/* Very subtle dot texture */}
           <svg
             className="absolute inset-0 w-full h-full hidden dark:block"
             xmlns="http://www.w3.org/2000/svg"
@@ -74,7 +125,7 @@ function App() {
 
         </div>
 
-        {/* ─── ROUTER CONTENT ─── */}
+        {/* ─── ROUTER ─── */}
         <Router>
           <Routes>
             <Route path="/login" element={isAuthenticated ? <Navigate to="/events" /> : <Login />} />
@@ -109,6 +160,12 @@ function App() {
             <Route path="/profile/:userId?" element={
               <ProtectedRoute>
                 <Profile />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             } />
 

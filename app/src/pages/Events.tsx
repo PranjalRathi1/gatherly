@@ -40,6 +40,16 @@ const Events = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
+  /* =========================
+     ✅ ROLE CHECK ADDED
+  ========================== */
+
+  const canCreate =
+    user?.role === 'creator' ||
+    user?.role === 'admin';
+
+  /* ========================= */
+
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -73,25 +83,25 @@ const Events = () => {
 
   const isAttending = (event: Event) => {
     if (!user) return false;
-    return event.attendees.some(
-      (a) => String(a._id) === String(user.id)
+    return event.attendees?.some(
+      (a) => a?.id && String(a.id) === String(user.id)
     );
   };
 
   const isCreator = (event: Event) => {
     if (!user) return false;
-    return String(event.creator._id) === String(user.id);
+    return event.creator?.id && String(event.creator.id) === String(user.id);
   };
 
   const hasRequested = (event: Event) => {
     if (!user) return false;
     return event.joinRequests?.some(
-      (id: any) => String(id) === String(user.id)
+      (id: any) => id && String(id) === String(user.id)
     );
   };
 
   const handleJoinEvent = async (event: Event) => {
-    setLoadingStates(prev => ({ ...prev, [event._id]: true }));
+    setLoadingStates(prev => ({ ...prev, [event.id]: true }));
 
     try {
       let code: string | undefined;
@@ -99,12 +109,12 @@ const Events = () => {
       if (event.visibility === 'private') {
         code = prompt('Enter join code') || undefined;
         if (!code) {
-          setLoadingStates(prev => ({ ...prev, [event._id]: false }));
+          setLoadingStates(prev => ({ ...prev, [event.id]: false }));
           return;
         }
       }
 
-      const response = await eventsApi.joinEvent(event._id, code);
+      const response = await eventsApi.joinEvent(event.id, code);
 
       if (response.message?.includes("Awaiting")) {
         toast({
@@ -125,7 +135,7 @@ const Events = () => {
         variant: "destructive"
       });
     } finally {
-      setLoadingStates(prev => ({ ...prev, [event._id]: false }));
+      setLoadingStates(prev => ({ ...prev, [event.id]: false }));
     }
   };
 
@@ -231,10 +241,22 @@ const Events = () => {
               Welcome <strong className="text-black dark:text-white">{user.username}</strong>
             </span>
 
+            {/* ✅ UPDATED CREATE BUTTON */}
             <Button
               size="sm"
               className="bg-black text-white dark:bg-white dark:text-black"
-              onClick={() => navigate('/events/create')}
+              onClick={() => {
+                if (!canCreate) {
+                  toast({
+                    title: "Access Restricted",
+                    description: "Only approved creators can create events.",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+
+                navigate('/events/create');
+              }}
             >
               + Create Event
             </Button>
@@ -247,6 +269,19 @@ const Events = () => {
               <UserCircle className="w-4 h-4 mr-2" />
               Profile
             </Button>
+
+
+            {user.role === 'admin' && (
+              <Button
+
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/admin')}
+              >
+
+                Admin Panel
+              </Button>
+            )}
 
             <SettingsDialog />
 
@@ -310,13 +345,13 @@ const Events = () => {
         >
           {filteredEvents.map(event => (
             <motion.div
-              key={event._id}
+              key={event.id}
               whileHover={{ y: -8, scale: 1.03 }}
               transition={{ type: "spring", stiffness: 200, damping: 15 }}
             >
               <Card className={`bg-[#141414] dark:bg-[#0f1115] relative flex flex-col h-full text-white shadow-lg transition-all duration-300 ${event.visibility === 'public'
-                  ? 'border border-transparent hover:border-emerald-600 hover:shadow-[0_0_0_4px_rgba(5,150,105,0.5),0_30px_80px_rgba(5,150,105,0.35)]'
-                  : 'border border-transparent hover:border-rose-600 hover:shadow-[0_0_0_4px_rgba(190,18,60,0.5),0_30px_80px_rgba(190,18,60,0.35)]'
+                ? 'border border-transparent hover:border-emerald-600 hover:shadow-[0_0_0_4px_rgba(5,150,105,0.5),0_30px_80px_rgba(5,150,105,0.35)]'
+                : 'border border-transparent hover:border-rose-600 hover:shadow-[0_0_0_4px_rgba(190,18,60,0.5),0_30px_80px_rgba(190,18,60,0.35)]'
                 }`}>
 
                 {event.imageUrl && (
@@ -376,7 +411,7 @@ const Events = () => {
                       <>
                         <Button
                           className="w-full bg-black text-white dark:bg-white dark:text-black"
-                          onClick={() => navigate(`/events/${event._id}/chat`)}
+                          onClick={() => navigate(`/events/${event.id}/chat`)}
                         >
                           <MessageCircle className="w-4 h-4 mr-2" />
                           Open Chat
@@ -387,7 +422,7 @@ const Events = () => {
                             <Button
                               variant="outline"
                               className="w-full"
-                              onClick={() => navigate(`/events/${event._id}/manage`)}
+                              onClick={() => navigate(`/events/${event.id}/manage`)}
                             >
                               Manage Requests
                             </Button>
@@ -395,7 +430,7 @@ const Events = () => {
                             <Button
                               variant="destructive"
                               className="w-full"
-                              onClick={() => handleDeleteEvent(event._id)}
+                              onClick={() => handleDeleteEvent(event.id)}
                             >
                               Delete Event
                             </Button>
@@ -404,7 +439,7 @@ const Events = () => {
                           <Button
                             variant="outline"
                             className="w-full"
-                            onClick={() => handleLeaveEvent(event._id)}
+                            onClick={() => handleLeaveEvent(event.id)}
                           >
                             Leave Event
                           </Button>
@@ -419,13 +454,13 @@ const Events = () => {
                         className="w-full bg-black text-white dark:bg-white dark:text-black"
                         onClick={() => handleJoinEvent(event)}
                         disabled={
-                          loadingStates[event._id] ||
+                          loadingStates[event.id] ||
                           event.attendees.length >= event.maxAttendees
                         }
                       >
                         {event.attendees.length >= event.maxAttendees
                           ? "Event Full"
-                          : loadingStates[event._id]
+                          : loadingStates[event.id]
                             ? "Joining..."
                             : event.visibility === 'private'
                               ? "Request / Join"

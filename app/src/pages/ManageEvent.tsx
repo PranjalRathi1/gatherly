@@ -34,7 +34,7 @@ const ManageEvent = () => {
         </div>
     );
 
-    if (event.creator._id !== user?.id) {
+    if (event.creator.id !== user?.id) {
         return (
             <div className="min-h-screen flex items-center justify-center">
                 <p className="text-foreground">Not authorized</p>
@@ -43,12 +43,12 @@ const ManageEvent = () => {
     }
 
     const handleApprove = async (userId: string) => {
-        await eventsApi.approveRequest(event._id, userId);
+        await eventsApi.approveRequest(event.id, userId);
         fetchEvent();
     };
 
     const handleReject = async (userId: string) => {
-        await eventsApi.rejectRequest(event._id, userId);
+        await eventsApi.rejectRequest(event.id, userId);
         fetchEvent();
     };
 

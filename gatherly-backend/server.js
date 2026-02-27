@@ -18,26 +18,22 @@ const server = http.createServer(app);
 // ✅ Allowed Origins Logic (Production Safe + Preview Safe)
 const allowedOrigins = [
   "http://localhost:5173",
-  process.env.FRONTEND_URL // production URL from Render env
+  process.env.FRONTEND_URL
 ];
 
 // CORS configuration for Express
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like Postman, curl)
     if (!origin) return callback(null, true);
 
-    // Allow localhost
     if (origin.includes("localhost")) {
       return callback(null, true);
     }
 
-    // Allow main production frontend
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // Allow any Vercel preview deployment
     if (origin.includes("vercel.app")) {
       return callback(null, true);
     }
@@ -46,6 +42,12 @@ app.use(cors({
   },
   credentials: true
 }));
+
+// ✅🔥 ADD THIS — DISABLE API CACHING (FIX 304 ISSUE)
+app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
 // Initialize Socket.io with same CORS logic
 const io = new Server(server, {

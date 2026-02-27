@@ -1,10 +1,21 @@
 const { Event } = require('../models');
+const { User } = require('../models');
 
 /* =====================================================
    CREATE EVENT
 ===================================================== */
 const createEvent = async (req, res) => {
   try {
+
+    // 🔐 CHECK USER ROLE
+    const user = await User.findById(req.userId);
+
+    if (!user || (user.role !== 'creator' && user.role !== 'admin')) {
+      return res.status(403).json({
+        message: 'You are not authorized to create events'
+      });
+    }
+
     const {
       title,
       description,

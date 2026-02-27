@@ -13,6 +13,7 @@ import { Calendar, ArrowLeft, Edit, Trophy, Award } from 'lucide-react';
 import VibeBadge from '@/components/VibeBadge';
 import { calculateVibeProfile, type VibeProfile } from '@/utils/vibeMatching';
 import { checkAchievements, calculateUserStats, type Achievement } from '@/utils/achievements';
+import authApi from '@/api/auth';
 
 const Profile = () => {
     const { userId } = useParams<{ userId?: string }>();
@@ -27,6 +28,7 @@ const Profile = () => {
     const [achievements, setAchievements] = useState<Achievement[]>([]);
     const [editData, setEditData] = useState({ displayName: '', avatar: '' });
 
+    // ✅ FIXED
     const isOwnProfile = !userId || userId === currentUser?.id;
 
     useEffect(() => {
@@ -36,7 +38,14 @@ const Profile = () => {
     const fetchProfile = async () => {
         try {
             setIsLoading(true);
+            setError('');
+
             const data = await profileApi.getProfile(userId);
+
+            if (!data || !data.user) {
+                throw new Error("Invalid profile response");
+            }
+
             setProfile(data);
 
             setEditData({
@@ -45,6 +54,8 @@ const Profile = () => {
             });
 
             const allEvents = await eventsApi.getAllEvents();
+
+            // ✅ FIXED
             const vibe = calculateVibeProfile(data.user.id, allEvents);
             setVibeProfile(vibe);
 
@@ -53,7 +64,7 @@ const Profile = () => {
             setAchievements(userAchievements);
 
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to load profile');
+            setError(err.response?.data?.message || err.message || 'Failed to load profile');
         } finally {
             setIsLoading(false);
         }
@@ -104,7 +115,6 @@ const Profile = () => {
         vibePercentages: { party: 0, adventure: 0, culture: 0, social: 0, explorer: 0 },
         totalScore: 0,
     };
-
     return (
         <div className="min-h-screen transition-colors duration-500">
 
@@ -134,6 +144,7 @@ const Profile = () => {
                 {/* PROFILE CARD */}
                 <Card className="bg-white/70 dark:bg-zinc-900/70 backdrop-blur border border-gray-200 dark:border-zinc-700 shadow-sm">
                     <CardHeader>
+
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-4">
 
@@ -151,12 +162,26 @@ const Profile = () => {
                                 </div>
 
                                 <div>
-                                    <h2 className="text-2xl font-bold text-black dark:text-white">
+                                    <h2 className="text-2xl font-bold text-black dark:text-white flex items-center gap-2">
                                         {profile.user.displayName || profile.user.username}
+
+                                        {/* ROLE BADGE */}
+                                        <span className={`text-xs px-2 py-1 rounded-full font-medium
+                            ${currentUser?.role === 'admin'
+                                                ? 'bg-red-500/20 text-red-600'
+                                                : currentUser?.role === 'creator'
+                                                    ? 'bg-purple-500/20 text-purple-600'
+                                                    : 'bg-gray-500/20 text-gray-600'
+                                            }`}
+                                        >
+                                            {currentUser?.role?.toUpperCase()}
+                                        </span>
                                     </h2>
+
                                     <p className="text-gray-600 dark:text-gray-400 font-mono">
                                         @{profile.user.username}
                                     </p>
+
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
                                         {profile.user.email}
                                     </p>
@@ -171,12 +196,14 @@ const Profile = () => {
                                             Edit Profile
                                         </Button>
                                     </DialogTrigger>
+
                                     <DialogContent className="bg-white dark:bg-zinc-900">
                                         <DialogHeader>
                                             <DialogTitle className="text-black dark:text-white">
                                                 Edit Profile
                                             </DialogTitle>
                                         </DialogHeader>
+
                                         <div className="space-y-4">
                                             <div>
                                                 <Label className="text-black dark:text-white">
@@ -211,6 +238,34 @@ const Profile = () => {
                             )}
                         </div>
                     </CardHeader>
+
+                    {/* 🔥 CREATOR ACCESS SECTION */}
+                    {isOwnProfile && currentUser?.role === 'user' && (
+                        <CardContent className="border-t border-gray-200 dark:border-zinc-700 pt-4">
+                            {currentUser.creatorRequestStatus === 'pending' ? (
+                                <p className="text-yellow-600 font-medium">
+                                    ⏳ Creator request pending approval
+                                </p>
+                            ) : currentUser.creatorRequestStatus === 'rejected' ? (
+                                <p className="text-red-500 font-medium">
+                                    ❌ Your previous request was rejected
+                                </p>
+                            ) : (
+                                <Button
+                                    onClick={async () => {
+                                        try {
+                                            await authApi.requestCreatorAccess();
+                                            alert("Creator request submitted successfully!");
+                                        } catch {
+                                            alert("Failed to submit request");
+                                        }
+                                    }}
+                                >
+                                    Request Creator Access
+                                </Button>
+                            )}
+                        </CardContent>
+                    )}
                 </Card>
 
                 {/* VIBE */}

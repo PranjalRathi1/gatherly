@@ -1,19 +1,19 @@
 import api from './axios';
 
 export interface AfterglowData {
-    _id: string;
+    id: string; // ✅ normalized
     title: string;
     content: string;
     author: {
-        _id: string;
+        id: string; // ✅ normalized
         username: string;
         email: string;
         displayName?: string;
     };
     tags: string[];
-    photos: string[]; // S3 URLs or base64
-    eventRef?: {  // Event reference (populated from backend)
-        _id: string;
+    photos: string[];
+    eventRef?: {
+        id: string; // ✅ normalized
         title: string;
         category: string;
         date: string;
@@ -28,31 +28,54 @@ export interface CreateAfterglowData {
     content: string;
     photos?: string[];
     tags?: string[];
-    eventRef?: string;  // Event ID to link
+    eventRef?: string;
 }
+
+/* 🔥 Normalization Helper */
+const normalizeAfterglow = (data: any): AfterglowData => ({
+    ...data,
+    id: data._id,
+    author: {
+        ...data.author,
+        id: data.author?._id,
+    },
+    eventRef: data.eventRef
+        ? {
+            ...data.eventRef,
+            id: data.eventRef._id,
+        }
+        : undefined,
+});
 
 export const afterglowApi = {
     getAllAfterglows: async (): Promise<AfterglowData[]> => {
-        const response = await api.get('/afterglows');  // Using new /afterglows endpoint
-        return response.data;
+        const response = await api.get('/afterglows');
+        return response.data.map(normalizeAfterglow);
     },
 
     getAfterglowById: async (id: string): Promise<AfterglowData> => {
         const response = await api.get(`/afterglows/${id}`);
-        return response.data;
+        return normalizeAfterglow(response.data);
     },
 
-    createAfterglow: async (data: CreateAfterglowData): Promise<AfterglowData> => {
+    createAfterglow: async (
+        data: CreateAfterglowData
+    ): Promise<AfterglowData> => {
         const response = await api.post('/afterglows', data);
-        return response.data.afterglow;  // Backend returns { message, afterglow }
+        return normalizeAfterglow(response.data.afterglow);
     },
 
-    updateAfterglow: async (id: string, data: CreateAfterglowData): Promise<AfterglowData> => {
+    updateAfterglow: async (
+        id: string,
+        data: CreateAfterglowData
+    ): Promise<AfterglowData> => {
         const response = await api.put(`/afterglows/${id}`, data);
-        return response.data.afterglow;  // Backend returns { message, afterglow }
+        return normalizeAfterglow(response.data.afterglow);
     },
 
-    deleteAfterglow: async (id: string): Promise<{ message: string }> => {
+    deleteAfterglow: async (
+        id: string
+    ): Promise<{ message: string }> => {
         const response = await api.delete(`/afterglows/${id}`);
         return response.data;
     }

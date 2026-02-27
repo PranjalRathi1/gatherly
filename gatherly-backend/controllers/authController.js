@@ -3,10 +3,15 @@ const jwt = require('jsonwebtoken');
 const { User } = require('../models');
 
 // Generate JWT Token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, {
-    expiresIn: '7d'
-  });
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      userId: user._id,
+      role: user.role
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
 };
 
 // @desc    Register new user
@@ -77,11 +82,12 @@ const signup = async (req, res) => {
     });
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     console.log('✅ User created successfully:', user.username);
 
     res.status(201).json({
+
       message: 'User created successfully',
       token,
       user: {
@@ -90,7 +96,9 @@ const signup = async (req, res) => {
         email: user.email,
         displayName: user.displayName,
         avatar: user.avatar,
-        penguinEnabled: user.penguinEnabled
+        penguinEnabled: user.penguinEnabled,
+        role: user.role,
+        creatorRequestStatus: user.creatorRequestStatus
       }
     });
   } catch (error) {
@@ -142,7 +150,8 @@ const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
+
 
     res.json({
       message: 'Login successful',
@@ -153,7 +162,9 @@ const login = async (req, res) => {
         email: user.email,
         displayName: user.displayName,
         avatar: user.avatar,
-        penguinEnabled: user.penguinEnabled
+        penguinEnabled: user.penguinEnabled,
+        role: user.role,
+        creatorRequestStatus: user.creatorRequestStatus
       }
     });
   } catch (error) {
@@ -210,9 +221,133 @@ const updateProfile = async (req, res) => {
   }
 };
 
+
+
+const requestCreatorRole = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'creator' || user.role === 'admin') {
+      return res.status(400).json({ message: 'You already have creator access' });
+    }
+
+    user.creatorRequestStatus = 'pending';
+    await user.save();
+
+    res.json({ message: 'Creator access request submitted successfully' });
+
+  } catch (error) {
+    console.error('Request creator role error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Approve creator request (Admin only)
+// @route   POST /api/auth/approve-creator/:userId
+// @access  Private (Admin)
+const approveCreatorRequest = async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+
+    // Check if current user is admin
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const userToApprove = await User.findById(req.params.userId);
+
+    if (!userToApprove) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (userToApprove.creatorRequestStatus !== 'pending') {
+      return res.status(400).json({ message: 'No pending request for this user' });
+    }
+
+    // Approve user
+    userToApprove.role = 'creator';
+    userToApprove.creatorRequestStatus = 'approved';
+    await userToApprove.save();
+
+    res.json({
+      message: 'User approved as creator successfully',
+      user: {
+        id: userToApprove._id,
+        username: userToApprove.username,
+        email: userToApprove.email,
+        role: userToApprove.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Approve creator error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get all pending creator requests
+// @route   GET /api/auth/pending-creators
+// @access  Private (Admin)
+const getPendingCreatorRequests = async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const pendingUsers = await User.find({ creatorRequestStatus: 'pending' })
+      .select('username email creatorRequestStatus');
+
+    res.json(pendingUsers);
+
+  } catch (error) {
+    console.error('Get pending creators error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc Reject creator request (Admin only)
+// @route POST /api/auth/reject-creator/:userId
+// @access Private (Admin)
+const rejectCreatorRequest = async (req, res) => {
+  try {
+    const adminUser = await User.findById(req.userId);
+
+    if (!adminUser || adminUser.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const userToReject = await User.findById(req.params.userId);
+
+    if (!userToReject) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    userToReject.creatorRequestStatus = 'rejected';
+    await userToReject.save();
+
+    res.json({
+      message: 'Creator request rejected successfully'
+    });
+
+  } catch (error) {
+    console.error('Reject creator error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   signup,
   login,
   getMe,
-  updateProfile
+  updateProfile,
+  requestCreatorRole,
+  approveCreatorRequest,
+  getPendingCreatorRequests,
+  rejectCreatorRequest
 };

@@ -22,6 +22,7 @@ const Afterglow = () => {
     const navigate = useNavigate();
     const { user } = useAuthStore();
     const { isOnline } = useBackendStatus();
+
     const [afterglows, setAfterglows] = useState<AfterglowData[]>([]);
     const [events, setEvents] = useState<Event[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -37,27 +38,26 @@ const Afterglow = () => {
         content: '',
         tags: '',
         photos: [] as string[],
-        eventRef: ''  // Event ID to link
+        eventRef: ''
     });
 
     useEffect(() => {
         fetchAfterglows();
         fetchUserEvents();
         updatePendingCount();
-
-        // Try to sync pending posts on mount
         syncPendingPosts();
     }, []);
 
     const fetchUserEvents = async () => {
         try {
             const data = await eventsApi.getAllEvents();
-            // Filter to only events user has joined
+
             const myEvents = data.filter(event =>
                 event.attendees?.some(attendee =>
-                    typeof attendee === 'string' ? attendee === user?.id : attendee._id === user?.id
+                    attendee.id === user?.id
                 )
             );
+
             setEvents(myEvents);
         } catch (err) {
             console.error('Failed to fetch events:', err);
@@ -86,23 +86,18 @@ const Afterglow = () => {
         const pending = getPendingPosts();
         if (pending.length === 0) return;
 
-        console.log(`Attempting to sync ${pending.length} pending post(s)...`);
-
         for (const post of pending) {
             try {
                 const response = await afterglowApi.createAfterglow(post.data);
-                markAsSynced(post.id, response._id);
-                console.log(`✅ Synced: ${post.data.title}`);
+                markAsSynced(post.id, response.id);
             } catch (error) {
-                console.warn(`❌ Failed to sync: ${post.data.title}`);
+                console.warn(`Failed to sync: ${post.data.title}`);
             }
         }
 
-        // Clean up synced posts
         clearSyncedPosts();
         updatePendingCount();
 
-        // Refresh the feed
         if (pending.length > 0) {
             fetchAfterglows();
         }
@@ -141,7 +136,7 @@ const Afterglow = () => {
                 content: afterglow.content,
                 tags: afterglow.tags.join(', '),
                 photos: afterglow.photos || [],
-                eventRef: afterglow.eventRef?._id || ''
+                eventRef: afterglow.eventRef?.id || ''
             });
         } else {
             resetForm();
@@ -162,6 +157,7 @@ const Afterglow = () => {
 
         try {
             const tags = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+
             const data = {
                 title: formData.title,
                 content: formData.content,
@@ -170,47 +166,46 @@ const Afterglow = () => {
                 eventRef: formData.eventRef || undefined
             };
 
-            // Create optimistic post for immediate UI feedback
             const tempId = `temp-${Date.now()}`;
+
             const optimisticPost: AfterglowData = {
-                _id: tempId,
+                id: tempId,
                 title: data.title,
                 content: data.content,
                 tags: data.tags,
                 photos: data.photos || [],
-                // Don't include eventRef in optimistic post - will be populated from server
                 author: {
-                    _id: user!.id,
+                    id: user!.id,
                     username: user!.username,
                     email: user!.email,
                     displayName: user?.displayName
                 },
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
-            };
+            } as AfterglowData;
 
             if (editingAfterglow) {
-                // Update existing
-                await afterglowApi.updateAfterglow(editingAfterglow._id, data);
+                await afterglowApi.updateAfterglow(editingAfterglow.id, data);
                 setSuccessMessage('Afterglow updated! ✨');
             } else {
-                // Create new - show optimistically
                 setAfterglows(prev => [optimisticPost, ...prev]);
                 handleCloseDialog();
 
-                // Try backend
                 try {
                     const response = await afterglowApi.createAfterglow(data);
-                    // Replace temp with real
-                    setAfterglows(prev => prev.map(a => a._id === tempId ? response : a));
+                    setAfterglows(prev =>
+                        prev.map(a => a.id === tempId ? response : a)
+                    );
                     setSuccessMessage('Afterglow shared! 🌟');
-                } catch (apiError: any) {
-                    // Backend failed - save to localStorage
+                } catch {
                     const savedId = saveToLocalStorage(data);
-                    // Update temp post to show pending status
-                    setAfterglows(prev => prev.map(a =>
-                        a._id === tempId ? { ...a, _id: savedId, isPending: true } as any : a
-                    ));
+                    setAfterglows(prev =>
+                        prev.map(a =>
+                            a.id === tempId
+                                ? { ...a, id: savedId, isPending: true } as any
+                                : a
+                        )
+                    );
                     setSuccessMessage('Saved locally. Will sync when online. 💾');
                     updatePendingCount();
                 }
@@ -225,7 +220,6 @@ const Afterglow = () => {
             setError(err.response?.data?.message || 'Failed to save Afterglow');
         } finally {
             setIsSubmitting(false);
-            // Clear success message after 5 seconds
             setTimeout(() => setSuccessMessage(''), 5000);
         }
     };
@@ -241,17 +235,15 @@ const Afterglow = () => {
         }
     };
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
+    const formatDate = (dateString: string) =>
+        new Date(dateString).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
             day: 'numeric'
         });
-    };
 
-    const isAuthor = (afterglow: AfterglowData) => {
-        return afterglow.author._id === user?.id;
-    };
+    const isAuthor = (afterglow: AfterglowData) =>
+        afterglow.author.id === user?.id;
 
     if (isLoading) {
         return (
@@ -412,7 +404,7 @@ const Afterglow = () => {
                                             >
                                                 <option value="">No event</option>
                                                 {events.map(event => (
-                                                    <option key={event._id} value={event._id}>
+                                                    <option key={event.id} value={event.id}>
                                                         {event.title}
                                                     </option>
                                                 ))}

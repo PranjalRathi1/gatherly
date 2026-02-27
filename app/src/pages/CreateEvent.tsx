@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { eventsApi } from '@/api/events';
 import { useAuthStore } from '@/store/authStore';
@@ -36,6 +36,24 @@ const CreateEvent = () => {
     });
 
     const [loading, setLoading] = useState(false);
+
+    /* =========================================
+       🔒 ROLE PROTECTION (NEW ADDITION)
+    ========================================== */
+
+    useEffect(() => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        if (user.role !== 'creator' && user.role !== 'admin') {
+            alert('This feature is restricted to approved creators.');
+            navigate('/events');
+        }
+    }, [user, navigate]);
+
+    /* ========================================= */
 
     const handleChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>

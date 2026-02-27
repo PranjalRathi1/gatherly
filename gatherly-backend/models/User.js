@@ -33,7 +33,24 @@ const userSchema = new mongoose.Schema({
   penguinEnabled: {
     type: Boolean,
     default: true
+  },
+
+  /* =========================
+     NEW FIELDS ADDED
+  ========================== */
+
+  role: {
+    type: String,
+    enum: ['user', 'creator', 'admin'],
+    default: 'user'
+  },
+
+  creatorRequestStatus: {
+    type: String,
+    enum: ['none', 'pending', 'approved', 'rejected'],
+    default: 'none'
   }
+
 }, {
   timestamps: true
 });

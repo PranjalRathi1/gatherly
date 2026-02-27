@@ -1,18 +1,18 @@
 import api from './axios';
 
 export interface Event {
-  _id: string;
+  id: string; // ✅ normalized
   title: string;
   description: string;
   date: string;
   location: string;
   creator: {
-    _id: string;
+    id: string;
     username: string;
     email: string;
   };
   attendees: Array<{
-    _id: string;
+    id: string;
     username: string;
   }>;
   maxAttendees: number;
@@ -20,14 +20,11 @@ export interface Event {
   imageUrl?: string;
   visibility: 'public' | 'private';
   joinCode?: string;
-
-  // ✅ Improved type (since backend populates joinRequests)
   joinRequests?: Array<{
-    _id: string;
+    id: string;
     username: string;
     email: string;
   }>;
-
   createdAt: string;
   updatedAt: string;
 }
@@ -44,26 +41,43 @@ export interface CreateEventData {
   imageUrl?: string;
 }
 
+/* 🔥 Normalization Helper */
+const normalizeEvent = (event: any): Event => ({
+  ...event,
+  id: event._id,
+  creator: {
+    ...event.creator,
+    id: event.creator?._id,
+  },
+  attendees: event.attendees?.map((a: any) => ({
+    ...a,
+    id: a._id,
+  })) || [],
+  joinRequests: event.joinRequests?.map((jr: any) => ({
+    ...jr,
+    id: jr._id,
+  })) || [],
+});
+
 export const eventsApi = {
   getAllEvents: async (): Promise<Event[]> => {
     const response = await api.get('/events');
-    return response.data;
+    return response.data.map(normalizeEvent);
   },
 
   getEventById: async (id: string): Promise<Event> => {
     const response = await api.get(`/events/${id}`);
-    return response.data;
+    return normalizeEvent(response.data);
   },
 
-  // ✅ NEW — Get Event By Join Code
   getEventByCode: async (code: string): Promise<Event> => {
     const response = await api.get(`/events/code/${code}`);
-    return response.data;
+    return normalizeEvent(response.data);
   },
 
   createEvent: async (data: CreateEventData): Promise<Event> => {
     const response = await api.post('/events', data);
-    return response.data;
+    return normalizeEvent(response.data);
   },
 
   joinEvent: async (
@@ -71,28 +85,44 @@ export const eventsApi = {
     joinCode?: string
   ): Promise<{ message: string; event: Event }> => {
     const response = await api.post(`/events/${id}/join`, { joinCode });
-    return response.data;
+
+    return {
+      ...response.data,
+      event: normalizeEvent(response.data.event),
+    };
   },
 
   leaveEvent: async (
     id: string
   ): Promise<{ message: string; event: Event }> => {
     const response = await api.post(`/events/${id}/leave`);
-    return response.data;
+
+    return {
+      ...response.data,
+      event: normalizeEvent(response.data.event),
+    };
   },
 
   approveRequest: async (eventId: string, userId: string) => {
     const response = await api.post(
       `/events/${eventId}/approve/${userId}`
     );
-    return response.data;
+
+    return {
+      ...response.data,
+      event: normalizeEvent(response.data.event),
+    };
   },
 
   rejectRequest: async (eventId: string, userId: string) => {
     const response = await api.post(
       `/events/${eventId}/reject/${userId}`
     );
-    return response.data;
+
+    return {
+      ...response.data,
+      event: normalizeEvent(response.data.event),
+    };
   },
 
   deleteEvent: async (
